@@ -130,7 +130,73 @@ test('scenario override shows badge and changes status', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Settings page loads
+// 6. Status transition to disconnected
+// ---------------------------------------------------------------------------
+test('status transitions to disconnected', async ({ page }) => {
+  await loadWithMock(page);
+
+  await expect(page.locator('[data-testid="status-label"]')).toBeVisible();
+
+  // Emit disconnected
+  await page.evaluate(() => {
+    (window as any).__TEST_EMIT__('status-changed', 'disconnected');
+  });
+
+  const label = page.locator('[data-testid="status-label"]');
+  await expect(label).toHaveText('Sleep');
+
+  const dot = page.locator('[data-testid="status-dot"]');
+  await expect(dot).toHaveClass(/\bdisconnected\b/);
+});
+
+// ---------------------------------------------------------------------------
+// 7. Status transition to searching
+// ---------------------------------------------------------------------------
+test('status transitions to searching', async ({ page }) => {
+  await loadWithMock(page);
+
+  await expect(page.locator('[data-testid="status-label"]')).toBeVisible();
+
+  // Emit searching
+  await page.evaluate(() => {
+    (window as any).__TEST_EMIT__('status-changed', 'searching');
+  });
+
+  const label = page.locator('[data-testid="status-label"]');
+  await expect(label).toHaveText('Searching...');
+
+  const dot = page.locator('[data-testid="status-dot"]');
+  await expect(dot).toHaveClass(/\bsearching\b/);
+});
+
+// ---------------------------------------------------------------------------
+// 8. Visiting status hides mascot
+// ---------------------------------------------------------------------------
+test('visiting status hides mascot', async ({ page }) => {
+  await loadWithMock(page);
+
+  // Wait for initial render and set idle so mascot is visible
+  await expect(page.locator('[data-testid="status-label"]')).toBeVisible();
+  await page.evaluate(() => {
+    (window as any).__TEST_EMIT__('status-changed', 'idle');
+  });
+  await expect(page.locator('[data-testid="mascot-sprite"]')).toBeVisible();
+
+  // Emit dog-away with true to trigger visiting status
+  await page.evaluate(() => {
+    (window as any).__TEST_EMIT__('dog-away', true);
+  });
+
+  // The mascot sprite should no longer be visible (replaced by placeholder div)
+  await expect(page.locator('[data-testid="mascot-sprite"]')).not.toBeVisible();
+
+  // The status pill should show "Visiting..."
+  const label = page.locator('[data-testid="status-label"]');
+  await expect(label).toHaveText('Visiting...');
+});
+
+// ---------------------------------------------------------------------------
+// 9. Settings page loads
 // ---------------------------------------------------------------------------
 test('settings page loads and renders form', async ({ page }) => {
   await loadWithMock(page, '/settings.html');
