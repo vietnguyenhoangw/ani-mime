@@ -105,4 +105,37 @@ describe("useBubble", () => {
 
     expect(result.current.visible).toBe(false);
   });
+
+  describe("auto-dismiss timer", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("auto-hides bubble after BUBBLE_DURATION_MS (7000ms)", async () => {
+      const { result } = renderHook(() => useBubble());
+      await act(async () => {});
+
+      // Trigger a bubble via task-completed
+      await act(async () => {
+        emitMockEvent("task-completed", { duration_secs: 5 });
+      });
+      expect(result.current.visible).toBe(true);
+
+      // At 6900ms the bubble should still be visible
+      act(() => {
+        vi.advanceTimersByTime(6900);
+      });
+      expect(result.current.visible).toBe(true);
+
+      // At 7000ms total the bubble should auto-hide
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      expect(result.current.visible).toBe(false);
+    });
+  });
 });
