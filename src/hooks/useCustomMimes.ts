@@ -2,7 +2,7 @@ import { useState, useLayoutEffect, useCallback } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { emit, listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import { copyFile, mkdir, exists, remove } from "@tauri-apps/plugin-fs";
+import { copyFile, mkdir, exists, remove, writeFile } from "@tauri-apps/plugin-fs";
 import { appDataDir } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Status, CustomMimeData } from "../types/status";
@@ -104,6 +104,32 @@ export function useCustomMimes() {
     [mimes, saveMimes, ensureSpritesDir]
   );
 
+  const addMimeFromBlobs = useCallback(async (
+    name: string,
+    spriteBlobs: Record<Status, { blob: Uint8Array; frames: number }>
+  ) => {
+    const id = `custom-${Date.now()}`;
+    const dir = await ensureSpritesDir();
+
+    const sprites: Record<string, { fileName: string; frames: number }> = {};
+    for (const status of ALL_STATUSES) {
+      const { blob, frames } = spriteBlobs[status];
+      const fileName = `${id}-${status}.png`;
+      const destPath = `${dir}/${fileName}`;
+      await writeFile(destPath, blob);
+      sprites[status] = { fileName, frames };
+    }
+
+    const newMime: CustomMimeData = {
+      id,
+      name,
+      sprites: sprites as Record<Status, { fileName: string; frames: number }>,
+    };
+
+    await saveMimes([...mimes, newMime]);
+    return id;
+  }, [mimes, saveMimes, ensureSpritesDir]);
+
   const deleteMime = useCallback(
     async (id: string) => {
       const mime = mimes.find((m) => m.id === id);
@@ -134,5 +160,5 @@ export function useCustomMimes() {
     []
   );
 
-  return { mimes, loaded, pickSpriteFile, addMime, deleteMime, getSpriteUrl };
+  return { mimes, loaded, pickSpriteFile, addMime, addMimeFromBlobs, deleteMime, getSpriteUrl };
 }
