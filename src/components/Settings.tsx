@@ -7,6 +7,10 @@ import { useBubble } from "../hooks/useBubble";
 import { useGlow, type GlowMode } from "../hooks/useGlow";
 import { useNickname } from "../hooks/useNickname";
 import { mimeCategories, getMimesByCategory } from "../constants/sprites";
+import { useCustomMimes, ALL_STATUSES } from "../hooks/useCustomMimes";
+import type { Status } from "../types/status";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { appDataDir } from "@tauri-apps/api/path";
 import "../styles/settings.css";
 
 type Tab = "general" | "mime" | "about";
@@ -23,13 +27,39 @@ export function Settings() {
   const { enabled: bubbleEnabled, setEnabled: setBubbleEnabled } = useBubble();
   const { mode: glowMode, setMode: setGlowMode } = useGlow();
   const { nickname, setNickname } = useNickname();
+  const { mimes: customMimes, pickSpriteFile, addMime, deleteMime } = useCustomMimes();
   const [tab, setTab] = useState<Tab>("general");
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [spriteInputs, setSpriteInputs] = useState<
+    Record<Status, { path: string; frames: number }>
+  >(() => {
+    const init: any = {};
+    for (const s of ALL_STATUSES) init[s] = { path: "", frames: 1 };
+    return init;
+  });
+  const [customPreviews, setCustomPreviews] = useState<Record<string, string>>({});
   const [draftNickname, setDraftNickname] = useState(nickname);
   const nicknameChanged = draftNickname !== nickname;
 
   useEffect(() => {
     setDraftNickname(nickname);
   }, [nickname]);
+  useEffect(() => {
+    const loadPreviews = async () => {
+      const base = await appDataDir();
+      const previews: Record<string, string> = {};
+      for (const mime of customMimes) {
+        const idleSprite = mime.sprites.idle;
+        if (idleSprite) {
+          previews[mime.id] = convertFileSrc(`${base}custom-sprites/${idleSprite.fileName}`);
+        }
+      }
+      setCustomPreviews(previews);
+    };
+    loadPreviews();
+  }, [customMimes]);
+
   const [devMode, setDevMode] = useState(false);
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -57,6 +87,48 @@ export function Settings() {
         clickCountRef.current = 0;
       }, 3000);
     }
+  };
+
+  const handlePickFile = async (status: Status) => {
+    const path = await pickSpriteFile();
+    if (path) {
+      setSpriteInputs((prev) => ({ ...prev, [status]: { ...prev[status], path } }));
+    }
+  };
+
+  const handleFrameChange = (status: Status, frames: number) => {
+    setSpriteInputs((prev) => ({ ...prev, [status]: { ...prev[status], frames } }));
+  };
+
+  const handleSaveCustom = async () => {
+    const allFilled = ALL_STATUSES.every((s) => spriteInputs[s].path && spriteInputs[s].frames > 0);
+    if (!newName.trim() || !allFilled) return;
+
+    const spriteFiles: Record<Status, { sourcePath: string; frames: number }> = {} as any;
+    for (const s of ALL_STATUSES) {
+      spriteFiles[s] = { sourcePath: spriteInputs[s].path, frames: spriteInputs[s].frames };
+    }
+
+    const id = await addMime(newName.trim(), spriteFiles);
+    setPet(id);
+    setCreating(false);
+    setNewName("");
+    const init: any = {};
+    for (const s of ALL_STATUSES) init[s] = { path: "", frames: 1 };
+    setSpriteInputs(init);
+  };
+
+  const handleDeleteCustom = async (id: string) => {
+    if (pet === id) setPet("rottweiler");
+    await deleteMime(id);
+  };
+
+  const handleCancelCreate = () => {
+    setCreating(false);
+    setNewName("");
+    const init: any = {};
+    for (const s of ALL_STATUSES) init[s] = { path: "", frames: 1 };
+    setSpriteInputs(init);
   };
 
   return (
@@ -154,7 +226,7 @@ export function Settings() {
                 </div>
               </div>
             </div>
-            {mimeCategories.map((cat) => {
+            {mimeCategories.filter((cat) => cat.key !== "custom").map((cat) => {
               const mimes = getMimesByCategory(cat.key);
               if (mimes.length === 0) return null;
               return (
@@ -190,6 +262,96 @@ export function Settings() {
                 </div>
               );
             })}
+            <div className="settings-section">
+              <div className="settings-section-title">Custom</div>
+              {creating ? (
+                <div className="custom-creator">
+                  <div className="settings-card" style={{ marginBottom: 10 }}>
+                    <div className="settings-row">
+                      <span className="settings-row-label">Name</span>
+                      <input
+                        type="text"
+                        className="settings-input"
+                        style={{ textAlign: "right" }}
+                        value={newName}
+                        placeholder="My Custom Mime"
+                        maxLength={20}
+                        onChange={(e) => setNewName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="settings-card">
+                    {ALL_STATUSES.map((s) => (
+                      <div className="settings-row" key={s}>
+                        <span className="settings-row-label status-label">{s}</span>
+                        <div className="sprite-input-group">
+                          <button className="sprite-pick-btn" onClick={() => handlePickFile(s)}>
+                            {spriteInputs[s].path
+                              ? spriteInputs[s].path.split("/").pop()
+                              : "Choose PNG"}
+                          </button>
+                          <input
+                            type="number"
+                            className="frame-count-input"
+                            min={1}
+                            max={99}
+                            value={spriteInputs[s].frames}
+                            onChange={(e) => handleFrameChange(s, Math.max(1, parseInt(e.target.value) || 1))}
+                            title="Frame count"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="custom-creator-actions">
+                    <button className="creator-btn cancel" onClick={handleCancelCreate}>
+                      Cancel
+                    </button>
+                    <button
+                      className="creator-btn save"
+                      onClick={handleSaveCustom}
+                      disabled={!newName.trim() || !ALL_STATUSES.every((s) => spriteInputs[s].path)}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="pet-grid">
+                  {customMimes.map((m) => (
+                    <div key={m.id} className="pet-card-wrapper">
+                      <button
+                        className={`pet-card ${pet === m.id ? "active" : ""}`}
+                        onClick={() => setPet(m.id)}
+                      >
+                        <div
+                          className="pet-preview"
+                          style={{
+                            backgroundImage: customPreviews[m.id] ? `url(${customPreviews[m.id]})` : "none",
+                            backgroundSize: "auto 48px",
+                            backgroundPosition: "0 0",
+                            backgroundRepeat: "no-repeat",
+                            imageRendering: "pixelated",
+                          }}
+                        />
+                        <span className="pet-name">{m.name}</span>
+                      </button>
+                      <button
+                        className="delete-mime-btn"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteCustom(m.id); }}
+                        title="Delete"
+                      >
+                        x
+                      </button>
+                    </div>
+                  ))}
+                  <button className="pet-card add-card" onClick={() => setCreating(true)}>
+                    <div className="add-icon">+</div>
+                    <span className="pet-name">Create</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
         {tab === "about" && (

@@ -333,3 +333,146 @@
 .nickname-save.active:hover {
   background: #0063d1;
 }
+
+/* Custom mime creator */
+.custom-creator {
+  margin-top: 4px;
+}
+
+.status-label {
+  text-transform: capitalize;
+  min-width: 90px;
+}
+
+.sprite-input-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sprite-pick-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.sprite-pick-btn:hover {
+  opacity: 1;
+}
+
+.frame-count-input {
+  width: 42px;
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  text-align: center;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+}
+
+.frame-count-input:focus {
+  border-color: #5e5ce6;
+  outline: none;
+}
+
+.custom-creator-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.creator-btn {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.creator-btn.cancel {
+  background: rgba(128, 128, 128, 0.15);
+  opacity: 0.7;
+}
+
+.creator-btn.cancel:hover {
+  opacity: 1;
+}
+
+.creator-btn.save {
+  background: #007aff;
+  color: #fff;
+}
+
+.creator-btn.save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.creator-btn.save:not(:disabled):hover {
+  background: #0063d1;
+}
+
+.add-card {
+  border-style: dashed !important;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.add-card:hover {
+  opacity: 0.8;
+}
+
+.add-icon {
+  font-size: 24px;
+  font-weight: 300;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+}
+
+.pet-card-wrapper {
+  position: relative;
+}
+
+.delete-mime-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: #ff3b30;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.pet-card-wrapper:hover .delete-mime-btn {
+  display: flex;
+}
