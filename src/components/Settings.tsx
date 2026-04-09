@@ -7,6 +7,7 @@ import { useBubble } from "../hooks/useBubble";
 import { useGlow, type GlowMode } from "../hooks/useGlow";
 import { useNickname } from "../hooks/useNickname";
 import { mimeCategories, getMimesByCategory } from "../constants/sprites";
+import { useScale } from "../hooks/useScale";
 import { useCustomMimes, ALL_STATUSES } from "../hooks/useCustomMimes";
 import { SmartImport } from "./SmartImport";
 import type { Status } from "../types/status";
@@ -28,6 +29,7 @@ export function Settings() {
   const { enabled: bubbleEnabled, setEnabled: setBubbleEnabled } = useBubble();
   const { mode: glowMode, setMode: setGlowMode } = useGlow();
   const { nickname, setNickname } = useNickname();
+  const { scale, setScale, SCALE_PRESETS } = useScale();
   const { mimes: customMimes, pickSpriteFile, addMime, addMimeFromBlobs, deleteMime } = useCustomMimes();
   const [tab, setTab] = useState<Tab>("general");
   const [creating, setCreating] = useState<false | "manual" | "smart">(false);
@@ -223,6 +225,28 @@ export function Settings() {
                     >
                       Save
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="settings-section">
+              <div className="settings-section-title">Display Size</div>
+              <div className="settings-card">
+                <div className="settings-row">
+                  <span className="settings-row-label">Scale</span>
+                  <div className="theme-toggle">
+                    {SCALE_PRESETS.map((s) => {
+                      const labels: Record<number, string> = { 0.5: "Tiny", 1: "Normal", 1.5: "Large", 2: "XL" };
+                      return (
+                        <button
+                          key={s}
+                          className={scale === s ? "active" : ""}
+                          onClick={() => setScale(s)}
+                        >
+                          {labels[s]}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

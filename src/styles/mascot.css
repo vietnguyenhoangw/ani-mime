@@ -4,7 +4,7 @@
   align-self: center;
   image-rendering: pixelated;
   background-repeat: no-repeat;
-  background-size: var(--sprite-width) 128px;
+  background-size: var(--sprite-width) var(--sprite-height);
   animation: sprite-play var(--sprite-duration) steps(var(--sprite-steps), end) infinite;
   filter: none;
 }

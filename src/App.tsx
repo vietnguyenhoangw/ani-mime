@@ -13,6 +13,7 @@ import { useVisitors } from "./hooks/useVisitors";
 import { usePeers } from "./hooks/usePeers";
 import { useNickname } from "./hooks/useNickname";
 import { usePet } from "./hooks/usePet";
+import { useScale } from "./hooks/useScale";
 import { useDevMode } from "./hooks/useDevMode";
 import { invoke } from "@tauri-apps/api/core";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
@@ -27,6 +28,7 @@ function App() {
   const peers = usePeers();
   const { nickname } = useNickname();
   const { pet } = usePet();
+  const { scale } = useScale();
   const { update, dismiss: dismissUpdate } = useUpdate();
   const devMode = useDevMode();
   useTheme();
@@ -88,7 +90,7 @@ function App() {
       )}
       <SpeechBubble visible={visible && !showUpdate} message={message} onDismiss={dismiss} />
       {status !== "visiting" && <Mascot status={status} />}
-      {status === "visiting" && <div style={{ width: 128, height: 128 }} />}
+      {status === "visiting" && <div style={{ width: 128 * scale, height: 128 * scale }} />}
       <StatusPill status={status} glow={visible} />
       {devMode && !scenario && <DevTag />}
       {visitors.map((v, i) => (

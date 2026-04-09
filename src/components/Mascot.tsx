@@ -3,6 +3,7 @@ import type { Status } from "../types/status";
 import { getSpriteMap, autoStopStatuses } from "../constants/sprites";
 import { usePet } from "../hooks/usePet";
 import { useGlow } from "../hooks/useGlow";
+import { useScale } from "../hooks/useScale";
 import { useCustomMimes } from "../hooks/useCustomMimes";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir } from "@tauri-apps/api/path";
@@ -15,6 +16,7 @@ interface MascotProps {
 export function Mascot({ status }: MascotProps) {
   const { pet } = usePet();
   const { mode: glowMode } = useGlow();
+  const { scale } = useScale();
   const { mimes } = useCustomMimes();
   const [frozen, setFrozen] = useState(false);
   const [customSpriteUrl, setCustomSpriteUrl] = useState<string | null>(null);
@@ -64,7 +66,8 @@ export function Mascot({ status }: MascotProps) {
     ).href;
   }
 
-  const lastFrameOffset = (frames - 1) * 128;
+  const frameSize = 128 * scale;
+  const lastFrameOffset = (frames - 1) * frameSize;
 
   if (isCustom && !customSpriteUrl) return null;
 
@@ -73,10 +76,11 @@ export function Mascot({ status }: MascotProps) {
       className={`sprite ${frozen ? "frozen" : ""} ${glowMode !== "off" ? `glow-${glowMode}` : ""}`}
       style={{
         backgroundImage: `url(${spriteUrl})`,
-        width: 128,
-        height: 128,
+        width: frameSize,
+        height: frameSize,
         "--sprite-steps": frames,
-        "--sprite-width": `${frames * 128}px`,
+        "--sprite-width": `${frames * frameSize}px`,
+        "--sprite-height": `${frameSize}px`,
         "--sprite-duration": `${frames * 80}ms`,
         ...(frozen ? { backgroundPosition: `-${lastFrameOffset}px 0` } : {}),
       } as React.CSSProperties}

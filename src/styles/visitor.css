@@ -1,7 +1,7 @@
 .visitor-dog {
   position: absolute;
-  bottom: 36px;
-  right: calc(-110px - var(--visitor-offset));
+  bottom: calc(36px * var(--sprite-scale, 1));
+  right: calc(-110px * var(--sprite-scale, 1) - var(--visitor-offset));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -28,7 +28,7 @@
 .visitor-sprite {
   image-rendering: pixelated;
   background-repeat: no-repeat;
-  background-size: var(--sprite-width) 96px;
+  background-size: var(--sprite-width) var(--sprite-height);
   animation: visitor-play var(--sprite-duration) steps(var(--sprite-steps), end) infinite;
   transform: scaleX(-1);
 }

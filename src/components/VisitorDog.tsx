@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getSpriteMap } from "../constants/sprites";
+import { useScale } from "../hooks/useScale";
 import type { Pet } from "../types/status";
 import "../styles/visitor.css";
 
@@ -11,6 +12,7 @@ interface VisitorDogProps {
 
 export function VisitorDog({ pet, nickname, index }: VisitorDogProps) {
   const [entered, setEntered] = useState(false);
+  const { scale } = useScale();
 
   useEffect(() => {
     requestAnimationFrame(() => setEntered(true));
@@ -23,7 +25,8 @@ export function VisitorDog({ pet, nickname, index }: VisitorDogProps) {
     import.meta.url
   ).href;
 
-  const offset = index * 80;
+  const visitorSize = 96 * scale;
+  const offset = index * 80 * scale;
 
   return (
     <div
@@ -35,10 +38,11 @@ export function VisitorDog({ pet, nickname, index }: VisitorDogProps) {
         className="visitor-sprite"
         style={{
           backgroundImage: `url(${spriteUrl})`,
-          width: 96,
-          height: 96,
+          width: visitorSize,
+          height: visitorSize,
           "--sprite-steps": sprite.frames,
-          "--sprite-width": `${sprite.frames * 96}px`,
+          "--sprite-width": `${sprite.frames * visitorSize}px`,
+          "--sprite-height": `${visitorSize}px`,
           "--sprite-duration": `${sprite.frames * 80}ms`,
         } as React.CSSProperties}
       />
