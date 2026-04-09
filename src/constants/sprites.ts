@@ -61,18 +61,47 @@ export const pets: PetInfo[] = [
       visiting: { file: "HancockSitting.png", frames: 10 },
     },
   },
+  {
+    id: "genjuro",
+    name: "Genjuro",
+    category: "character",
+    preview: "GenjuroIdle.png",
+    sprites: {
+      disconnected: { file: "GenjuroSleep.png", frames: 2 },
+      busy: { file: "GenjuroSniff.png", frames: 8 },
+      service: { file: "GenjuroBark.png", frames: 9 },
+      idle: { file: "GenjuroIdle.png", frames: 6 },
+      searching: { file: "GenjuroSearching.png", frames: 10 },
+      initializing: { file: "GenjuroSearching.png", frames: 10 },
+      visiting: { file: "GenjuroSitting.png", frames: 5 },
+    },
+  },
 ];
 
 export const mimeCategories: { key: MimeCategory; label: string }[] = [
   { key: "pet", label: "Pet" },
   { key: "character", label: "Character" },
+  { key: "custom", label: "Custom" },
 ];
 
 export function getMimesByCategory(category: MimeCategory): PetInfo[] {
   return pets.filter((p) => p.category === category);
 }
 
+const customSpriteOverrides: Record<string, Record<Status, SpriteConfig>> = {};
+
+export function registerCustomSprites(petId: string, sprites: Record<Status, SpriteConfig>) {
+  customSpriteOverrides[petId] = sprites;
+}
+
+export function unregisterCustomSprites(petId: string) {
+  delete customSpriteOverrides[petId];
+}
+
 export function getSpriteMap(petId: Pet): Record<Status, SpriteConfig> {
+  if (customSpriteOverrides[petId]) {
+    return customSpriteOverrides[petId];
+  }
   const pet = pets.find((p) => p.id === petId);
   return pet ? pet.sprites : pets[0].sprites;
 }
