@@ -12,9 +12,12 @@ export interface SpriteConfig {
   frames: number;
 }
 
-export type Pet = "rottweiler" | "dalmatian" | "samurai" | "hancock";
+export type BuiltinPet = "rottweiler" | "dalmatian" | "samurai" | "hancock" | "genjuro";
 
-export type MimeCategory = "pet" | "character";
+// Pet can be a built-in ID or a custom mime ID (e.g. "custom-abc123")
+export type Pet = BuiltinPet | (string & {});
+
+export type MimeCategory = "pet" | "character" | "custom";
 
 export interface PetInfo {
   id: Pet;
@@ -22,4 +25,10 @@ export interface PetInfo {
   category: MimeCategory;
   preview: string;
   sprites: Record<Status, SpriteConfig>;
+}
+
+export interface CustomMimeData {
+  id: string;
+  name: string;
+  sprites: Record<Status, { fileName: string; frames: number }>;
 }
