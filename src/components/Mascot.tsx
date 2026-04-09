@@ -73,6 +73,7 @@ export function Mascot({ status }: MascotProps) {
 
   return (
     <div
+      data-testid="mascot-sprite"
       className={`sprite ${frozen ? "frozen" : ""} ${glowMode !== "off" ? `glow-${glowMode}` : ""}`}
       style={{
         backgroundImage: `url(${spriteUrl})`,

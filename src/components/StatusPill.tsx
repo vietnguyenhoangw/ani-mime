@@ -28,9 +28,9 @@ const labelMap: Record<Status, string> = {
 
 export function StatusPill({ status, glow }: StatusPillProps) {
   return (
-    <div className={`pill ${glow ? "neon-glow" : ""} ${status === "busy" ? "neon-busy" : ""}`}>
-      <span className={dotClassMap[status] ?? "dot searching"} />
-      <span className="label">{labelMap[status] ?? "Searching..."}</span>
+    <div data-testid="status-pill" className={`pill ${glow ? "neon-glow" : ""} ${status === "busy" ? "neon-busy" : ""}`}>
+      <span data-testid="status-dot" className={dotClassMap[status] ?? "dot searching"} />
+      <span data-testid="status-label" className="label">{labelMap[status] ?? "Searching..."}</span>
     </div>
   );
 }

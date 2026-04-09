@@ -2,12 +2,10 @@ import { render, act } from "@testing-library/react";
 import { Mascot } from "../../components/Mascot";
 import type { Status } from "../../types/status";
 
-// Mock @tauri-apps/api/path (not aliased in vitest config)
 vi.mock("@tauri-apps/api/path", () => ({
   appDataDir: vi.fn(async () => "/mock/app/data/"),
 }));
 
-// Mock @tauri-apps/api/dpi (not aliased in vitest config)
 vi.mock("@tauri-apps/api/dpi", () => ({
   LogicalSize: class LogicalSize {
     width: number;

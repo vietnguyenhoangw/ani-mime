@@ -77,11 +77,12 @@ function App() {
 
   return (
     <div
+      data-testid="app-container"
       className={`container ${dragging ? "dragging" : ""} ${scenario ? "scenario-active" : ""}`}
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}
     >
-      {scenario && <div className="scenario-badge">SCENARIO</div>}
+      {scenario && <div data-testid="scenario-badge" className="scenario-badge">SCENARIO</div>}
       {showUpdate && (
         <UpdateBanner
           latest={update.latest}
