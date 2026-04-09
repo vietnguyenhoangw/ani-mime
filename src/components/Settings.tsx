@@ -8,6 +8,7 @@ import { useGlow, type GlowMode } from "../hooks/useGlow";
 import { useNickname } from "../hooks/useNickname";
 import { mimeCategories, getMimesByCategory } from "../constants/sprites";
 import { useCustomMimes, ALL_STATUSES } from "../hooks/useCustomMimes";
+import { SmartImport } from "./SmartImport";
 import type { Status } from "../types/status";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir } from "@tauri-apps/api/path";
@@ -27,9 +28,9 @@ export function Settings() {
   const { enabled: bubbleEnabled, setEnabled: setBubbleEnabled } = useBubble();
   const { mode: glowMode, setMode: setGlowMode } = useGlow();
   const { nickname, setNickname } = useNickname();
-  const { mimes: customMimes, pickSpriteFile, addMime, deleteMime } = useCustomMimes();
+  const { mimes: customMimes, pickSpriteFile, addMime, addMimeFromBlobs, deleteMime } = useCustomMimes();
   const [tab, setTab] = useState<Tab>("general");
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<false | "manual" | "smart">(false);
   const [newName, setNewName] = useState("");
   const [spriteInputs, setSpriteInputs] = useState<
     Record<Status, { path: string; frames: number }>
@@ -264,7 +265,7 @@ export function Settings() {
             })}
             <div className="settings-section">
               <div className="settings-section-title">Custom</div>
-              {creating ? (
+              {creating === "manual" ? (
                 <div className="custom-creator">
                   <div className="settings-card" style={{ marginBottom: 10 }}>
                     <div className="settings-row">
@@ -316,6 +317,15 @@ export function Settings() {
                     </button>
                   </div>
                 </div>
+              ) : creating === "smart" ? (
+                <SmartImport
+                  onSave={async (mimeName, blobs) => {
+                    const id = await addMimeFromBlobs(mimeName, blobs);
+                    setPet(id);
+                    setCreating(false);
+                  }}
+                  onCancel={handleCancelCreate}
+                />
               ) : (
                 <div className="pet-grid">
                   {customMimes.map((m) => (
@@ -345,9 +355,13 @@ export function Settings() {
                       </button>
                     </div>
                   ))}
-                  <button className="pet-card add-card" onClick={() => setCreating(true)}>
+                  <button className="pet-card add-card" onClick={() => setCreating("manual")}>
                     <div className="add-icon">+</div>
-                    <span className="pet-name">Create</span>
+                    <span className="pet-name">Manual</span>
+                  </button>
+                  <button className="pet-card add-card" onClick={() => setCreating("smart")}>
+                    <div className="add-icon">*</div>
+                    <span className="pet-name">Import</span>
                   </button>
                 </div>
               )}

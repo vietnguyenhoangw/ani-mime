@@ -476,3 +476,120 @@
 .pet-card-wrapper:hover .delete-mime-btn {
   display: flex;
 }
+
+/* Smart Import */
+.smart-import {
+  margin-top: 4px;
+}
+
+.smart-import-pick {
+  margin-top: 4px;
+}
+
+.smart-import-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  font-size: 13px;
+}
+
+.smart-import-dropzone:hover {
+  opacity: 0.8;
+}
+
+.smart-import-hint {
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.smart-import-file {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.smart-import-rows-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+.smart-import-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.08);
+}
+
+.smart-import-row:last-child {
+  border-bottom: none;
+}
+
+.smart-import-row-preview {
+  width: 80px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.05);
+  flex-shrink: 0;
+}
+
+.smart-import-row-preview img {
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.smart-import-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.smart-import-row-label {
+  font-size: 12px;
+  font-weight: 500;
+  display: block;
+}
+
+.smart-import-row-frames {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.smart-import-select {
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.smart-import-select:focus {
+  border-color: #5e5ce6;
+  outline: none;
+}
+
+.smart-import-warning {
+  font-size: 11px;
+  color: #ff9500;
+  text-align: center;
+  margin-top: 8px;
+  opacity: 0.8;
+}
+
+.add-icon-img {
+  font-size: 20px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+}
