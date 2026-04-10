@@ -261,7 +261,16 @@ test('upload Charlotte as custom sprite via manual flow', async ({ page }) => {
     await expect(pickButtons.nth(i)).toHaveText('charlotte.png');
   }
 
-  // Save should now be enabled (name filled + all 7 files selected)
+  // Customise frame specs using range expressions
+  // idle=1-5, busy=8, service=1-3, disconnected=1, searching=41-55,57,58, initializing=1-4, visiting=2-6,8
+  const frameInputs = creator.locator('.frame-count-input');
+  const frameSpecs = ['1-5', '8', '1-3', '1', '41-55,57,58', '1-4', '2-6,8'];
+
+  for (let i = 0; i < frameSpecs.length; i++) {
+    await frameInputs.nth(i).fill(frameSpecs[i]);
+  }
+
+  // Save should be enabled (name + files + valid frame specs)
   await expect(saveBtn).toBeEnabled();
 
   // Save the custom mime
@@ -273,4 +282,44 @@ test('upload Charlotte as custom sprite via manual flow', async ({ page }) => {
   // Charlotte should appear in the custom mimes list
   const charlotteName = page.locator('.pet-card-wrapper .pet-name', { hasText: 'Charlotte' });
   await expect(charlotteName).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 11. Charlotte sprite renders at tiny (0.5x) size
+// ---------------------------------------------------------------------------
+test('Charlotte sprite renders at tiny size (64×64) on main page', async ({ page }) => {
+  await loadWithMock(page);
+
+  // Wait for initial render
+  await expect(page.locator('[data-testid="app-container"]')).toBeVisible();
+
+  const charlotte = {
+    id: 'custom-12345',
+    name: 'Charlotte',
+    sprites: {
+      idle:          { fileName: 'custom-12345-idle.png',          frames: 5 },
+      busy:          { fileName: 'custom-12345-busy.png',          frames: 8 },
+      service:       { fileName: 'custom-12345-service.png',       frames: 3 },
+      disconnected:  { fileName: 'custom-12345-disconnected.png',  frames: 1 },
+      searching:     { fileName: 'custom-12345-searching.png',     frames: 17 },
+      initializing:  { fileName: 'custom-12345-initializing.png',  frames: 4 },
+      visiting:      { fileName: 'custom-12345-visiting.png',      frames: 6 },
+    },
+  };
+
+  // Set Charlotte as the active pet at tiny (0.5x) scale via events
+  await page.evaluate((mimeData) => {
+    const emit = (window as any).__TEST_EMIT__;
+    emit('custom-mimes-changed', [mimeData]);
+    emit('pet-changed', 'custom-12345');
+    emit('scale-changed', 0.5);
+  }, charlotte);
+
+  // The sprite appears once the custom sprite URL resolves asynchronously
+  const sprite = page.locator('[data-testid="mascot-sprite"]');
+  await expect(sprite).toBeVisible();
+
+  // At scale 0.5, sprite should be 64×64 (128 * 0.5)
+  await expect(sprite).toHaveCSS('width', '64px');
+  await expect(sprite).toHaveCSS('height', '64px');
 });

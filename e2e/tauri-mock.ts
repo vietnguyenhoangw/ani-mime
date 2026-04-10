@@ -214,5 +214,10 @@ export const tauriMockScript = `
   window.__TEST_EMIT__ = function (event, payload) {
     handleEmit({ event, payload });
   };
+
+  // Pre-seed a mock store value before the page boots.
+  window.__TEST_SEED_STORE__ = function (storePath, key, value) {
+    getOrCreateStore(storePath).set(key, value);
+  };
 })();
 `;

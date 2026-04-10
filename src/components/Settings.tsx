@@ -26,6 +26,32 @@ const STATUS_DESCRIPTIONS: Record<Status, string> = {
   visiting: "A friend's mime is visiting from the local network",
 };
 
+/** Parse a frame spec like "5", "1-5", or "41-55,57,58" into a total frame count. Returns 0 for invalid input. */
+function parseFrameSpec(spec: string): number {
+  const trimmed = spec.trim();
+  if (!trimmed) return 0;
+  if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+
+  let count = 0;
+  for (const part of trimmed.split(",")) {
+    const p = part.trim();
+    const range = p.match(/^(\d+)-(\d+)$/);
+    if (range) {
+      const start = parseInt(range[1], 10);
+      const end = parseInt(range[2], 10);
+      if (end < start) return 0;
+      count += end - start + 1;
+    } else if (/^\d+$/.test(p)) {
+      count += 1;
+    } else {
+      return 0;
+    }
+  }
+  return count;
+}
+
+export { parseFrameSpec };
+
 type Tab = "general" | "mime" | "about";
 
 const tabTitles: Record<Tab, string> = {
@@ -46,10 +72,10 @@ export function Settings() {
   const [creating, setCreating] = useState<false | "manual" | "smart">(false);
   const [newName, setNewName] = useState("");
   const [spriteInputs, setSpriteInputs] = useState<
-    Record<Status, { path: string; frames: number }>
+    Record<Status, { path: string; frames: string }>
   >(() => {
     const init: any = {};
-    for (const s of ALL_STATUSES) init[s] = { path: "", frames: 1 };
+    for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
     return init;
   });
   const [customPreviews, setCustomPreviews] = useState<Record<string, string>>({});
@@ -126,17 +152,17 @@ export function Settings() {
     }
   };
 
-  const handleFrameChange = (status: Status, frames: number) => {
-    setSpriteInputs((prev) => ({ ...prev, [status]: { ...prev[status], frames } }));
+  const handleFrameChange = (status: Status, value: string) => {
+    setSpriteInputs((prev) => ({ ...prev, [status]: { ...prev[status], frames: value } }));
   };
 
   const handleSaveCustom = async () => {
-    const allFilled = ALL_STATUSES.every((s) => spriteInputs[s].path && spriteInputs[s].frames > 0);
+    const allFilled = ALL_STATUSES.every((s) => spriteInputs[s].path && parseFrameSpec(spriteInputs[s].frames) > 0);
     if (!newName.trim() || !allFilled) return;
 
     const spriteFiles: Record<Status, { sourcePath: string; frames: number }> = {} as any;
     for (const s of ALL_STATUSES) {
-      spriteFiles[s] = { sourcePath: spriteInputs[s].path, frames: spriteInputs[s].frames };
+      spriteFiles[s] = { sourcePath: spriteInputs[s].path, frames: parseFrameSpec(spriteInputs[s].frames) };
     }
 
     const id = await addMime(newName.trim(), spriteFiles);
@@ -144,7 +170,7 @@ export function Settings() {
     setCreating(false);
     setNewName("");
     const init: any = {};
-    for (const s of ALL_STATUSES) init[s] = { path: "", frames: 1 };
+    for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
     setSpriteInputs(init);
   };
 
@@ -157,7 +183,7 @@ export function Settings() {
     setCreating(false);
     setNewName("");
     const init: any = {};
-    for (const s of ALL_STATUSES) init[s] = { path: "", frames: 1 };
+    for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
     setSpriteInputs(init);
   };
 
@@ -346,13 +372,12 @@ export function Settings() {
                               : "Choose PNG"}
                           </button>
                           <input
-                            type="number"
+                            type="text"
                             className="frame-count-input"
-                            min={1}
-                            max={99}
                             value={spriteInputs[s].frames}
-                            onChange={(e) => handleFrameChange(s, Math.max(1, parseInt(e.target.value) || 1))}
-                            title="Frame count"
+                            onChange={(e) => handleFrameChange(s, e.target.value)}
+                            placeholder="e.g. 1-5"
+                            title="Frame count or range (e.g. 1-5, 41-55,57,58)"
                           />
                         </div>
                       </div>
@@ -365,7 +390,7 @@ export function Settings() {
                     <button
                       className="creator-btn save"
                       onClick={handleSaveCustom}
-                      disabled={!newName.trim() || !ALL_STATUSES.every((s) => spriteInputs[s].path)}
+                      disabled={!newName.trim() || !ALL_STATUSES.every((s) => spriteInputs[s].path && parseFrameSpec(spriteInputs[s].frames) > 0)}
                     >
                       Save
                     </button>
