@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { useCustomMimes, ALL_STATUSES } from "../../hooks/useCustomMimes";
-import { mockStoreValue } from "../../__mocks__/tauri-store";
+import { mockStoreValue, getMockStore } from "../../__mocks__/tauri-store";
 import { emitMockEvent } from "../../__mocks__/tauri-event";
 import { listen } from "@tauri-apps/api/event";
 import { mkdir, writeFile, remove, exists } from "@tauri-apps/plugin-fs";
@@ -95,6 +95,11 @@ describe("useCustomMimes", () => {
       expect(result.current.mimes[0].sprites[status]).toBeDefined();
       expect(result.current.mimes[0].sprites[status].frames).toBe(4);
     }
+
+    // Persisted to store
+    const store = getMockStore("settings.json");
+    expect(store!.set).toHaveBeenCalledWith("customMimes", expect.any(Array));
+    expect(store!.save).toHaveBeenCalled();
   });
 
   it("deleteMime removes from list", async () => {
@@ -117,6 +122,11 @@ describe("useCustomMimes", () => {
     expect(remove).toHaveBeenCalledTimes(ALL_STATUSES.length);
 
     expect(result.current.mimes).toHaveLength(0);
+
+    // Persisted to store
+    const store = getMockStore("settings.json");
+    expect(store!.set).toHaveBeenCalledWith("customMimes", []);
+    expect(store!.save).toHaveBeenCalled();
   });
 
   it("deleteMime handles missing files gracefully", async () => {
