@@ -2,7 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useScale } from "../../hooks/useScale";
 import { mockStoreValue } from "../../__mocks__/tauri-store";
 import { emitMockEvent } from "../../__mocks__/tauri-event";
-import { getCurrentWindow } from "../../__mocks__/tauri-window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 describe("useScale", () => {
   it("returns default scale of 1", async () => {

@@ -97,14 +97,20 @@ describe("useBubble", () => {
     const { result, unmount } = renderHook(() => useBubble());
     await act(async () => {});
 
+    // Make bubble visible before unmount
+    await act(async () => {
+      emitMockEvent("task-completed", { duration_secs: 5 });
+    });
+    expect(result.current.visible).toBe(true);
+
     unmount();
 
-    // Emit event after unmount — state should not change
+    // Emit event after unmount — state should stay at pre-unmount value
     await act(async () => {
       emitMockEvent("task-completed", { duration_secs: 10 });
     });
 
-    expect(result.current.visible).toBe(false);
+    expect(result.current.visible).toBe(true);
   });
 
   describe("auto-dismiss timer", () => {
