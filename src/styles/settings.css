@@ -577,6 +577,27 @@
   outline: none;
 }
 
+.smart-import-bg-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.smart-import-bg-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.smart-import-bg-hex {
+  font-family: monospace;
+  font-size: 11px;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+
 .smart-import-warning {
   font-size: 11px;
   color: #ff9500;

@@ -1,5 +1,5 @@
 const FRAME_SIZE = 128;
-const WHITE_THRESHOLD = 240;
+const BG_TOLERANCE = 30;
 const ALPHA_THRESHOLD = 10;
 
 export interface DetectedRow {
@@ -26,25 +26,67 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Draw image to canvas and make white/near-white pixels transparent */
-export function prepareCanvas(img: HTMLImageElement): HTMLCanvasElement {
+export type BgColor = { r: number; g: number; b: number };
+
+function colorDistance(a: BgColor, b: BgColor): number {
+  return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
+}
+
+/** Detect the dominant background color by sampling the 4 corners */
+export function detectBgColor(canvas: HTMLCanvasElement): BgColor {
+  const ctx = canvas.getContext("2d")!;
+  const { width, height } = canvas;
+
+  const corners = [
+    ctx.getImageData(1, 1, 1, 1).data,
+    ctx.getImageData(width - 2, 1, 1, 1).data,
+    ctx.getImageData(1, height - 2, 1, 1).data,
+    ctx.getImageData(width - 2, height - 2, 1, 1).data,
+  ];
+
+  const colors = corners.map((d) => ({ r: d[0], g: d[1], b: d[2] }));
+  let bestColor = colors[0];
+  let bestCount = 0;
+
+  for (const candidate of colors) {
+    const count = colors.filter((c) => colorDistance(c, candidate) <= BG_TOLERANCE).length;
+    if (count > bestCount) {
+      bestCount = count;
+      bestColor = candidate;
+    }
+  }
+
+  return bestColor;
+}
+
+/** Draw image to canvas and remove background pixels within tolerance of bgColor */
+export function prepareCanvas(
+  img: HTMLImageElement,
+  bgColor?: BgColor
+): { canvas: HTMLCanvasElement; bgColor: BgColor } {
   const canvas = document.createElement("canvas");
   canvas.width = img.width;
   canvas.height = img.height;
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(img, 0, 0);
 
+  const detectedColor = bgColor ?? detectBgColor(canvas);
+
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
 
   for (let i = 0; i < data.length; i += 4) {
-    if (data[i] > WHITE_THRESHOLD && data[i + 1] > WHITE_THRESHOLD && data[i + 2] > WHITE_THRESHOLD) {
-      data[i + 3] = 0; // make transparent
+    const dist = colorDistance(
+      { r: data[i], g: data[i + 1], b: data[i + 2] },
+      detectedColor
+    );
+    if (dist <= BG_TOLERANCE) {
+      data[i + 3] = 0;
     }
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return canvas;
+  return { canvas, bgColor: detectedColor };
 }
 
 /** Detect rows of sprites by finding horizontal transparent gaps */

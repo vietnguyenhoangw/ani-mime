@@ -9,6 +9,7 @@ import {
   createStrip,
   getRowPreview,
   type DetectedRow,
+  type BgColor,
 } from "../utils/spriteSheetProcessor";
 import { ALL_STATUSES } from "../hooks/useCustomMimes";
 
@@ -39,6 +40,8 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
   const [name, setName] = useState("");
   const [processing, setProcessing] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [bgColor, setBgColor] = useState<BgColor | null>(null);
+  const [imgElement, setImgElement] = useState<HTMLImageElement | null>(null);
 
   const handlePickSheet = useCallback(async () => {
     const result = await open({
@@ -50,7 +53,9 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
     setFileName(result.split("/").pop() ?? "");
     const src = convertFileSrc(result);
     const img = await loadImage(src);
-    const prepared = prepareCanvas(img);
+    setImgElement(img);
+    const { canvas: prepared, bgColor: detectedBg } = prepareCanvas(img);
+    setBgColor(detectedBg);
     setCanvas(prepared);
 
     const detected = detectRows(prepared);
@@ -72,6 +77,26 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
 
     setAssignments(autoAssign as Record<Status, number[]>);
   }, []);
+
+  const reprocessWithColor = useCallback((newColor: BgColor) => {
+    if (!imgElement) return;
+    setBgColor(newColor);
+    const { canvas: prepared } = prepareCanvas(imgElement, newColor);
+    setCanvas(prepared);
+
+    const detected = detectRows(prepared);
+    setRows(detected);
+    const previews = detected.map((row) => getRowPreview(prepared, row));
+    setRowPreviews(previews);
+
+    const autoAssign: Record<string, number[]> = {};
+    for (const s of ALL_STATUSES) autoAssign[s] = [];
+    const statusOrder: Status[] = ["idle", "busy", "service", "disconnected", "searching", "initializing", "visiting"];
+    for (let i = 0; i < Math.min(detected.length, statusOrder.length); i++) {
+      autoAssign[statusOrder[i]] = [i];
+    }
+    setAssignments(autoAssign as Record<Status, number[]>);
+  }, [imgElement]);
 
   const getStatusForRow = useCallback((rowIndex: number): Status | null => {
     for (const s of ALL_STATUSES) {
@@ -135,6 +160,41 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
             <div className="settings-row">
               <span className="settings-row-label">Detected</span>
               <span className="smart-import-file">{rows.length} rows</span>
+            </div>
+            <div className="settings-row">
+              <span className="settings-row-label">Background</span>
+              <div className="smart-import-bg-picker">
+                {bgColor && (
+                  <>
+                    <div
+                      className="smart-import-bg-swatch"
+                      style={{ backgroundColor: `rgb(${bgColor.r},${bgColor.g},${bgColor.b})` }}
+                    />
+                    <span className="smart-import-bg-hex">
+                      #{bgColor.r.toString(16).padStart(2, "0")}{bgColor.g.toString(16).padStart(2, "0")}{bgColor.b.toString(16).padStart(2, "0")}
+                    </span>
+                  </>
+                )}
+                <select
+                  className="smart-import-select"
+                  value=""
+                  onChange={(e) => {
+                    const hex = e.target.value;
+                    if (!hex) return;
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    reprocessWithColor({ r, g, b });
+                  }}
+                >
+                  <option value="">Change...</option>
+                  <option value="#00B800">Green</option>
+                  <option value="#FF00FF">Magenta</option>
+                  <option value="#0000FF">Blue</option>
+                  <option value="#000000">Black</option>
+                  <option value="#FFFFFF">White</option>
+                </select>
+              </div>
             </div>
           </div>
 
