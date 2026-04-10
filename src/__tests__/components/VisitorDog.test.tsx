@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import { VisitorDog } from "../../components/VisitorDog";
 
 vi.mock("@tauri-apps/api/dpi", () => ({
@@ -46,12 +46,14 @@ describe("VisitorDog", () => {
       <VisitorDog pet="dalmatian" nickname="Buddy" index={0} />
     );
 
-    // requestAnimationFrame is used for the enter animation
-    // In jsdom, we can trigger it manually
-    await vi.waitFor(() => {
-      const dog = container.querySelector(".visitor-dog");
-      expect(dog).toHaveClass("entered");
+    // Flush the requestAnimationFrame callback within act() so the
+    // setEntered(true) state update doesn't fire outside of act()
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
     });
+
+    const dog = container.querySelector(".visitor-dog");
+    expect(dog).toHaveClass("entered");
   });
 
   it("uses idle sprite for visitors", () => {

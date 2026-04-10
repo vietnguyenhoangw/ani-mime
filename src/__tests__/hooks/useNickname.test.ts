@@ -1,12 +1,14 @@
 import { renderHook, act } from "@testing-library/react";
 import { useNickname } from "../../hooks/useNickname";
-import { mockStoreValue } from "../../__mocks__/tauri-store";
+import { mockStoreValue, getMockStore } from "../../__mocks__/tauri-store";
 import { emitMockEvent } from "../../__mocks__/tauri-event";
 import { listen } from "@tauri-apps/api/event";
 
 describe("useNickname", () => {
-  it("defaults to empty string", () => {
+  it("defaults to empty string", async () => {
     const { result } = renderHook(() => useNickname());
+    await act(async () => {});
+
     expect(result.current.nickname).toBe("");
   });
 
@@ -29,6 +31,11 @@ describe("useNickname", () => {
     });
 
     expect(result.current.nickname).toBe("Rex");
+
+    // Verify store persistence
+    const store = getMockStore("settings.json");
+    expect(store!.set).toHaveBeenCalledWith("nickname", "Rex");
+    expect(store!.save).toHaveBeenCalled();
   });
 
   it("updates when nickname-changed event fires", async () => {

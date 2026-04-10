@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { useTheme } from "../../hooks/useTheme";
-import { mockStoreValue } from "../../__mocks__/tauri-store";
+import { mockStoreValue, getMockStore } from "../../__mocks__/tauri-store";
 import { emitMockEvent } from "../../__mocks__/tauri-event";
 import { listen } from "@tauri-apps/api/event";
 
@@ -9,8 +9,10 @@ afterEach(() => {
 });
 
 describe("useTheme", () => {
-  it("defaults to dark theme", () => {
+  it("defaults to dark theme", async () => {
     const { result } = renderHook(() => useTheme());
+    await act(async () => {});
+
     expect(result.current.theme).toBe("dark");
   });
 
@@ -51,6 +53,11 @@ describe("useTheme", () => {
 
     expect(result.current.theme).toBe("light");
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+
+    // Verify store persistence
+    const store = getMockStore("settings.json");
+    expect(store!.set).toHaveBeenCalledWith("theme", "light");
+    expect(store!.save).toHaveBeenCalled();
   });
 
   it("updates when theme-changed event fires", async () => {

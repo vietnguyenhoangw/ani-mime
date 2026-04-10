@@ -1,12 +1,14 @@
 import { renderHook, act } from "@testing-library/react";
 import { usePet } from "../../hooks/usePet";
-import { mockStoreValue } from "../../__mocks__/tauri-store";
+import { mockStoreValue, getMockStore } from "../../__mocks__/tauri-store";
 import { emitMockEvent } from "../../__mocks__/tauri-event";
 import { listen } from "@tauri-apps/api/event";
 
 describe("usePet", () => {
-  it("defaults to rottweiler", () => {
+  it("defaults to rottweiler", async () => {
     const { result } = renderHook(() => usePet());
+    await act(async () => {});
+
     expect(result.current.pet).toBe("rottweiler");
   });
 
@@ -29,6 +31,11 @@ describe("usePet", () => {
     });
 
     expect(result.current.pet).toBe("samurai");
+
+    // Verify store persistence
+    const store = getMockStore("settings.json");
+    expect(store!.set).toHaveBeenCalledWith("pet", "samurai");
+    expect(store!.save).toHaveBeenCalled();
   });
 
   it("updates when pet-changed event fires", async () => {
