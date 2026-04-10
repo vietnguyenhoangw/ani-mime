@@ -1,6 +1,6 @@
 [package]
 name = "ani-mime"
-version = "0.14.15"
+version = "0.14.19"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"

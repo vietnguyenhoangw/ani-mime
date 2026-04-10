@@ -1,4 +1,4 @@
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 
 const GITHUB_RELEASES_URL: &str =
     "https://api.github.com/repos/vietnguyenhoangw/ani-mime/releases/latest";
@@ -45,13 +45,94 @@ pub fn check_for_updates(app_handle: tauri::AppHandle) {
             }
         }
 
-        // Emit update-available event to frontend
-        let _ = app_handle.emit("update-available", serde_json::json!({
-            "latest": latest,
-            "current": current,
-        }));
-        crate::app_log!("[updater] emitted update-available event");
+        show_update_dialog(&app_handle, current, &latest);
     });
+}
+
+/// Manual check from menu — always shows a dialog (up-to-date or update available).
+pub fn check_for_updates_manual(app_handle: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        let current = env!("CARGO_PKG_VERSION");
+        crate::app_log!("[updater] manual check (current: v{})", current);
+
+        let latest = match fetch_latest_version() {
+            Some(v) => v,
+            None => {
+                let _ = std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg("display alert \"Update Check Failed\" message \"Could not reach GitHub. Please check your internet connection.\" buttons {\"OK\"} default button \"OK\"")
+                    .output();
+                return;
+            }
+        };
+
+        if !is_newer(&latest, current) {
+            crate::app_log!("[updater] manual check: up to date");
+            let script = format!(
+                "display alert \"You are up to date\" message \"Ani-Mime v{} is the latest version.\" buttons {{\"OK\"}} default button \"OK\"",
+                current
+            );
+            let _ = std::process::Command::new("osascript")
+                .arg("-e")
+                .arg(&script)
+                .output();
+            return;
+        }
+
+        crate::app_log!("[updater] manual check: update available v{}", latest);
+        show_update_dialog(&app_handle, current, &latest);
+    });
+}
+
+fn show_update_dialog(app_handle: &tauri::AppHandle, current: &str, latest: &str) {
+    let release_url = format!("https://github.com/vietnguyenhoangw/ani-mime/releases/tag/v{}", latest);
+
+    loop {
+        let script = format!(
+            "display alert \"Ani-Mime v{latest} Available\" message \"You are currently on v{current}.\\n\\nA new version is ready with improvements and bug fixes.\\nTap Changelog to see what is new.\" buttons {{\"Later\", \"Changelog\", \"Update Now\"}} default button \"Update Now\"",
+            latest = latest,
+            current = current,
+        );
+
+        match std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .output()
+        {
+            Ok(o) => {
+                let result = String::from_utf8_lossy(&o.stdout).to_string();
+                let button = result
+                    .split("button returned:")
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                crate::app_log!("[updater] user pressed: {}", button);
+
+                match button.as_str() {
+                    "Update Now" => {
+                        update_now();
+                        break;
+                    }
+                    "Changelog" => {
+                        crate::app_log!("[updater] opening changelog: {}", release_url);
+                        let _ = std::process::Command::new("open")
+                            .arg(&release_url)
+                            .spawn();
+                        continue;
+                    }
+                    _ => {
+                        crate::app_log!("[updater] user chose Later or dismissed");
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                crate::app_error!("[updater] failed to show dialog: {}", e);
+                break;
+            }
+        }
+    }
 }
 
 fn fetch_latest_version() -> Option<String> {
@@ -78,12 +159,11 @@ fn is_newer(latest: &str, current: &str) -> bool {
     l > c
 }
 
-#[tauri::command]
-pub fn update_now() {
+fn update_now() {
     crate::app_log!("[updater] user chose: Update");
     let script = r#"tell application "Terminal"
     activate
-    do script "brew upgrade --cask ani-mime"
+    do script "brew update && brew upgrade --cask ani-mime"
 end tell"#;
     let _ = std::process::Command::new("osascript")
         .arg("-e")
@@ -91,13 +171,6 @@ end tell"#;
         .spawn();
 }
 
-#[tauri::command]
-pub fn skip_version(version: String, app_handle: tauri::AppHandle) {
-    crate::app_log!("[updater] user chose: Skip v{}", version);
-    if let Ok(app_data_dir) = app_handle.path().app_data_dir() {
-        save_skipped_version(&app_data_dir.join("settings.json"), &version);
-    }
-}
 
 fn save_skipped_version(store_path: &std::path::Path, version: &str) {
     let mut json: serde_json::Value = if store_path.exists() {

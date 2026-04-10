@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { PetStatusScenario } from "./PetStatusScenario";
+import { DialogPreviewScenario } from "./DialogPreviewScenario";
 
 export interface ScenarioDefinition {
   id: string;
@@ -16,5 +17,12 @@ export const scenarios: ScenarioDefinition[] = [
     description: "Switch between all pet statuses for visual testing",
     icon: "\u{1F43E}",
     component: PetStatusScenario,
+  },
+  {
+    id: "dialog-preview",
+    name: "Dialog Preview",
+    description: "Preview all native dialogs and speech bubbles",
+    icon: "\u{1F4AC}",
+    component: DialogPreviewScenario,
   },
 ];

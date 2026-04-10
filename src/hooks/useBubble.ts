@@ -107,6 +107,25 @@ export function useBubble() {
     };
   }, [enabled]);
 
+  // Listen for discovery-hint: no peers found after timeout
+  useEffect(() => {
+    const unlisten = listen<string>("discovery-hint", (e) => {
+      if (e.payload !== "no_peers") return;
+
+      clearTimeout(timerRef.current);
+      setMessage("No friends nearby! Check Privacy \u2192 Local Network");
+      setVisible(true);
+
+      timerRef.current = setTimeout(() => {
+        setVisible(false);
+      }, 10000);
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   const dismiss = useCallback(() => {
     clearTimeout(timerRef.current);
     setVisible(false);

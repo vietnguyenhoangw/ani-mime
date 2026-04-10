@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.14.19] - 2026-04-10
+
+### Added
+- **Dialog Preview scenario**: New scenario in Superpower Tool to preview all native macOS dialogs and speech bubbles without side effects (update alerts, setup dialogs, bubbles)
+
+### Changed
+- **Native update dialog**: Replaced in-app update banner with native macOS alert dialog (Later / Changelog / Update Now)
+- **Check for Updates menu**: Added "Check for Updates..." item to the macOS menu bar for manual update checks
+
+## [0.14.16] - 2026-04-09
+
+### Added
+- **New contributor**: thanh-dong added to the About page
+
+### Fixed
+- Peer detection not working in release mode on macOS (added Info.plist with Bonjour networking entitlements)
+- Unused variable in UpdateBanner causing CI build failure
+- Version display in Settings now shows correct version
+
 ## [0.14.15] - 2026-04-08
 
 ### Added

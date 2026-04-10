@@ -147,18 +147,30 @@ pub fn start_discovery(
         };
 
         // Periodic heartbeat thread — logs discovery status every 30s
+        // Also emits a one-shot "discovery-hint" event if no peers found after first check
         let heartbeat_state = app_state.clone();
+        let heartbeat_handle = app_handle.clone();
         std::thread::spawn(move || {
+            let mut hint_emitted = false;
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(30));
                 let st = heartbeat_state.lock().unwrap();
                 let peer_names: Vec<String> = st.peers.values()
                     .map(|p| format!("{}({}:{})", p.nickname, p.ip, p.port))
                     .collect();
+                let peer_count = peer_names.len();
                 if peer_names.is_empty() {
                     crate::app_log!("[discovery] heartbeat: 0 peers found, still listening on port {}", st.discovery_port);
                 } else {
                     crate::app_log!("[discovery] heartbeat: {} peers: [{}]", peer_names.len(), peer_names.join(", "));
+                }
+                drop(st);
+
+                // One-shot hint: if still no peers after 30s, nudge the user
+                if !hint_emitted && peer_count == 0 {
+                    hint_emitted = true;
+                    crate::app_log!("[discovery] no peers after 30s, emitting discovery-hint");
+                    let _ = heartbeat_handle.emit("discovery-hint", "no_peers");
                 }
             }
         });

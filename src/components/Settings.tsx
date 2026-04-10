@@ -402,7 +402,7 @@ export function Settings() {
                   onClick={handleVersionClick}
                   style={{ userSelect: "none" }}
                 >
-                  Version 0.14.12{devMode && " (Dev Mode)"}
+                  Version 0.14.19{devMode && " (Dev Mode)"}
                 </div>
                 <div className="about-desc">A floating macOS desktop mascot that reacts to terminal and Claude Code activity in real-time.</div>
               </div>
@@ -434,6 +434,7 @@ export function Settings() {
                   {[
                     { login: "thnh-dng", avatar: "https://avatars.githubusercontent.com/u/213000297?v=4" },
                     { login: "yanmad27", avatar: "https://avatars.githubusercontent.com/u/38394675?v=4" },
+                    { login: "thanh-dong", avatar: "https://avatars.githubusercontent.com/u/15724923?v=4" },
                   ].map((c) => (
                     <a
                       key={c.login}

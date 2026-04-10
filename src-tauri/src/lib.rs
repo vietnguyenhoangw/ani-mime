@@ -46,6 +46,106 @@ fn scenario_override(status: Option<String>, app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+fn preview_dialog(dialog_id: String, app: tauri::AppHandle) {
+    use crate::setup::shell::macos_dialog;
+
+    std::thread::spawn(move || {
+        let current = env!("CARGO_PKG_VERSION");
+
+        match dialog_id.as_str() {
+            // --- Update dialogs ---
+            "update_available" => {
+                let script = format!(
+                    "display alert \"Ani-Mime v99.0.0 Available\" message \"You are currently on v{}.\\n\\nA new version is ready with improvements and bug fixes.\\nTap Changelog to see what is new.\" buttons {{\"Later\", \"Changelog\", \"Update Now\"}} default button \"Update Now\"",
+                    current,
+                );
+                let _ = std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg(&script)
+                    .output();
+            }
+            "update_up_to_date" => {
+                let script = format!(
+                    "display alert \"You are up to date\" message \"Ani-Mime v{} is the latest version.\" buttons {{\"OK\"}} default button \"OK\"",
+                    current,
+                );
+                let _ = std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg(&script)
+                    .output();
+            }
+            "update_failed" => {
+                let _ = std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg("display alert \"Update Check Failed\" message \"Could not reach GitHub. Please check your internet connection.\" buttons {\"OK\"} default button \"OK\"")
+                    .output();
+            }
+
+            // --- Setup dialogs ---
+            "setup_shell_single" => {
+                macos_dialog(
+                    "Ani-Mime Setup",
+                    "zsh detected. Ani-Mime needs to add a hook to ~/.zshrc to track terminal activity.\n\nAllow setup?",
+                    &["Yes", "Skip"],
+                );
+            }
+            "setup_shell_multiple" => {
+                let script = r#"choose from list {"zsh", "bash", "fish", "All"} with title "Ani-Mime Setup" with prompt "Multiple shells detected. Select which ones to set up for terminal tracking:" with multiple selections allowed"#;
+                let _ = std::process::Command::new("osascript")
+                    .arg("-e")
+                    .arg(script)
+                    .output();
+            }
+            "setup_claude" => {
+                macos_dialog(
+                    "Ani-Mime Setup",
+                    "Ani-Mime also supports Claude Code! Your mascot can react in real-time when Claude is thinking or using tools.\n\nThis will add lightweight hooks to ~/.claude/settings.json.\n\nWould you like to enable it?",
+                    &["Yes", "Skip"],
+                );
+            }
+            "setup_complete" => {
+                macos_dialog(
+                    "Ani-Mime",
+                    "Setup complete!\n\nPlease open a new terminal tab or window for the tracking to take effect.",
+                    &["OK"],
+                );
+            }
+            "setup_no_shells" => {
+                macos_dialog(
+                    "Ani-Mime",
+                    "No supported shell found (zsh, bash, or fish).\n\nPlease install one and restart the app.",
+                    &["OK"],
+                );
+            }
+            "setup_no_selected" => {
+                macos_dialog(
+                    "Ani-Mime",
+                    "Ani-Mime requires at least one shell (zsh, bash, or fish) to be configured for terminal tracking.\n\nThe app will now close.\nRestart Ani-Mime when you're ready to set up.",
+                    &["OK"],
+                );
+            }
+
+            // --- Speech bubbles (emit events to frontend) ---
+            "bubble_welcome" => {
+                let _ = app.emit("status-changed", "idle");
+            }
+            "bubble_task_completed" => {
+                let _ = app.emit("task-completed", serde_json::json!({ "duration_secs": 5 }));
+            }
+            "bubble_discovery_hint" => {
+                let _ = app.emit("discovery-hint", "no_peers");
+            }
+
+            _ => {
+                crate::app_warn!("[preview] unknown dialog_id: {}", dialog_id);
+            }
+        }
+
+        crate::app_log!("[preview] triggered dialog: {}", dialog_id);
+    });
+}
+
+#[tauri::command]
 fn open_superpower(app: tauri::AppHandle) -> Result<(), String> {
     crate::app_log!("[app] opening superpower tool");
     if let Some(win) = app.get_webview_window("superpower") {
@@ -173,7 +273,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_superpower, scenario_override, updater::update_now, updater::skip_version])
+        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_superpower, scenario_override, preview_dialog, updater::update_now, updater::skip_version])
         .setup(|app| {
             crate::app_log!("[app] starting Ani-Mime v{}", env!("CARGO_PKG_VERSION"));
 
@@ -185,6 +285,7 @@ pub fn run() {
                 .item(&PredefinedMenuItem::about(app, Some("About Ani-Mime"), None)?)
                 .separator()
                 .item(&MenuItemBuilder::with_id("settings", "Settings...").accelerator("Cmd+,").build(app)?)
+                .item(&MenuItemBuilder::with_id("check-update", "Check for Updates...").build(app)?)
                 .separator()
                 .item(&PredefinedMenuItem::quit(app, Some("Quit Ani-Mime"))?)
                 .build()?;
@@ -196,12 +297,19 @@ pub fn run() {
             // Handle menu events
             let handle = app.handle().clone();
             app.on_menu_event(move |_app, event| {
-                if event.id().as_ref() == "settings" {
-                    crate::app_log!("[app] settings menu clicked");
-                    if let Some(win) = handle.get_webview_window("settings") {
-                        let _ = win.show();
-                        let _ = win.set_focus();
+                match event.id().as_ref() {
+                    "settings" => {
+                        crate::app_log!("[app] settings menu clicked");
+                        if let Some(win) = handle.get_webview_window("settings") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
                     }
+                    "check-update" => {
+                        crate::app_log!("[app] check for updates menu clicked");
+                        updater::check_for_updates_manual(handle.clone());
+                    }
+                    _ => {}
                 }
             });
 

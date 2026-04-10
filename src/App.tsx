@@ -1,14 +1,12 @@
 import { Mascot } from "./components/Mascot";
 import { StatusPill } from "./components/StatusPill";
 import { SpeechBubble } from "./components/SpeechBubble";
-import { UpdateBanner } from "./components/UpdateBanner";
 import { VisitorDog } from "./components/VisitorDog";
 import { DevTag } from "./components/DevTag";
 import { useStatus } from "./hooks/useStatus";
 import { useDrag } from "./hooks/useDrag";
 import { useTheme } from "./hooks/useTheme";
 import { useBubble } from "./hooks/useBubble";
-import { useUpdate } from "./hooks/useUpdate";
 import { useVisitors } from "./hooks/useVisitors";
 import { usePeers } from "./hooks/usePeers";
 import { useNickname } from "./hooks/useNickname";
@@ -33,8 +31,6 @@ function App() {
   const devMode = useDevMode();
   useTheme();
 
-  const showUpdate = update && status !== "busy" && status !== "service";
-
   const onContextMenu = async (e: React.MouseEvent) => {
     e.preventDefault();
 
@@ -45,7 +41,7 @@ function App() {
     if (peers.length === 0) {
       const item = await MenuItem.new({
         id: "no-peers",
-        text: "No peers nearby",
+        text: "No peers nearby \u2014 check Local Network permission",
         enabled: false,
       });
       items.push(item);
