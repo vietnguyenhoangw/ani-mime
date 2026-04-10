@@ -173,6 +173,99 @@ function detectColumns(canvas: HTMLCanvasElement, y1: number, y2: number): { x1:
   return cols;
 }
 
+export interface Frame {
+  index: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** Flatten all detected rows into a numbered list of individual frames */
+export function extractFrames(rows: DetectedRow[]): Frame[] {
+  const frames: Frame[] = [];
+  for (const row of rows) {
+    for (const col of row.sprites) {
+      frames.push({ index: frames.length, x1: col.x1, y1: row.y1, x2: col.x2, y2: row.y2 });
+    }
+  }
+  return frames;
+}
+
+/** Render a single frame as a data URL preview (48px tall) */
+export function getFramePreview(canvas: HTMLCanvasElement, frame: Frame, size: number = 48): string {
+  const ctx = canvas.getContext("2d")!;
+  const sw = frame.x2 - frame.x1;
+  const sh = frame.y2 - frame.y1;
+  const spriteData = ctx.getImageData(frame.x1, frame.y1, sw, sh);
+  const bbox = getTightBBox(spriteData);
+  if (!bbox) return "";
+
+  const cropW = bbox.x2 - bbox.x1;
+  const cropH = bbox.y2 - bbox.y1;
+  const scale = Math.min(size / cropW, size / cropH);
+  const scaledW = Math.round(cropW * scale);
+  const scaledH = Math.round(cropH * scale);
+
+  const preview = document.createElement("canvas");
+  preview.width = size;
+  preview.height = size;
+  const pctx = preview.getContext("2d")!;
+  pctx.imageSmoothingEnabled = false;
+  pctx.drawImage(
+    canvas,
+    frame.x1 + bbox.x1, frame.y1 + bbox.y1, cropW, cropH,
+    Math.round((size - scaledW) / 2), Math.round((size - scaledH) / 2), scaledW, scaledH
+  );
+  return preview.toDataURL("image/png");
+}
+
+/** Create a horizontal sprite strip from specific frame indices */
+export async function createStripFromFrames(
+  canvas: HTMLCanvasElement,
+  frames: Frame[],
+  indices: number[]
+): Promise<ProcessedStrip> {
+  const ctx = canvas.getContext("2d")!;
+  const selected = indices.map((i) => frames[i]).filter(Boolean);
+
+  if (selected.length === 0) {
+    throw new Error("No frames selected");
+  }
+
+  const stripCanvas = document.createElement("canvas");
+  stripCanvas.width = FRAME_SIZE * selected.length;
+  stripCanvas.height = FRAME_SIZE;
+  const stripCtx = stripCanvas.getContext("2d")!;
+  stripCtx.imageSmoothingEnabled = false;
+
+  for (let i = 0; i < selected.length; i++) {
+    const f = selected[i];
+    const sw = f.x2 - f.x1;
+    const sh = f.y2 - f.y1;
+    const spriteData = ctx.getImageData(f.x1, f.y1, sw, sh);
+    const bbox = getTightBBox(spriteData);
+    if (!bbox) continue;
+
+    const cropW = bbox.x2 - bbox.x1;
+    const cropH = bbox.y2 - bbox.y1;
+    const scale = Math.min(FRAME_SIZE / cropW, FRAME_SIZE / cropH);
+    const scaledW = Math.round(cropW * scale);
+    const scaledH = Math.round(cropH * scale);
+    const ox = Math.round((FRAME_SIZE - scaledW) / 2);
+    const oy = Math.round((FRAME_SIZE - scaledH) / 2);
+
+    stripCtx.drawImage(
+      canvas,
+      f.x1 + bbox.x1, f.y1 + bbox.y1, cropW, cropH,
+      i * FRAME_SIZE + ox, oy, scaledW, scaledH
+    );
+  }
+
+  const blob = await canvasToUint8Array(stripCanvas);
+  return { blob, frames: selected.length };
+}
+
 /** Create a horizontal sprite strip from selected rows, scaled to FRAME_SIZE */
 export async function createStrip(
   canvas: HTMLCanvasElement,

@@ -6,9 +6,10 @@ import {
   loadImage,
   prepareCanvas,
   detectRows,
-  createStrip,
-  getRowPreview,
-  type DetectedRow,
+  extractFrames,
+  getFramePreview,
+  createStripFromFrames,
+  type Frame,
   type BgColor,
 } from "../utils/spriteSheetProcessor";
 import { ALL_STATUSES } from "../hooks/useCustomMimes";
@@ -28,11 +29,40 @@ const STATUS_LABELS: Record<Status, string> = {
   visiting: "Visiting",
 };
 
+/** Parse "1-5" or "1,2,3,5,6" into 0-based indices. Returns sorted unique indices. */
+function parseFrameInput(input: string, maxFrame: number): number[] {
+  const indices = new Set<number>();
+  for (const part of input.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const range = trimmed.split("-");
+    if (range.length === 2) {
+      const start = parseInt(range[0]);
+      const end = parseInt(range[1]);
+      if (!isNaN(start) && !isNaN(end)) {
+        for (let i = Math.max(1, start); i <= Math.min(maxFrame, end); i++) {
+          indices.add(i - 1); // convert to 0-based
+        }
+      }
+    } else {
+      const n = parseInt(trimmed);
+      if (!isNaN(n) && n >= 1 && n <= maxFrame) {
+        indices.add(n - 1);
+      }
+    }
+  }
+  return [...indices].sort((a, b) => a - b);
+}
+
 export function SmartImport({ onSave, onCancel }: SmartImportProps) {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
-  const [rows, setRows] = useState<DetectedRow[]>([]);
-  const [rowPreviews, setRowPreviews] = useState<string[]>([]);
-  const [assignments, setAssignments] = useState<Record<Status, number[]>>(() => {
+  const [frames, setFrames] = useState<Frame[]>([]);
+  const [frameInputs, setFrameInputs] = useState<Record<Status, string>>(() => {
+    const init: any = {};
+    for (const s of ALL_STATUSES) init[s] = "";
+    return init;
+  });
+  const [previewFrames, setPreviewFrames] = useState<Record<Status, string[]>>(() => {
     const init: any = {};
     for (const s of ALL_STATUSES) init[s] = [];
     return init;
@@ -43,6 +73,8 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
   const [bgColor, setBgColor] = useState<BgColor | null>(null);
   const [imgElement, setImgElement] = useState<HTMLImageElement | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [allFramePreviews, setAllFramePreviews] = useState<string[]>([]);
 
   const handlePickSheet = useCallback(async () => {
     setError(null);
@@ -71,18 +103,25 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
         setError("No sprite rows detected. Try a different image or background color.");
         return;
       }
-      setRows(detected);
 
-      const previews = detected.map((row) => getRowPreview(prepared, row));
-      setRowPreviews(previews);
+      const allFrames = extractFrames(detected);
+      setFrames(allFrames);
 
-      const autoAssign: Record<string, number[]> = {};
-      for (const s of ALL_STATUSES) autoAssign[s] = [];
-      const statusOrder: Status[] = ["idle", "busy", "service", "disconnected", "searching", "initializing", "visiting"];
-      for (let i = 0; i < Math.min(detected.length, statusOrder.length); i++) {
-        autoAssign[statusOrder[i]] = [i];
+      // Auto-assign: distribute frames evenly across statuses
+      const perStatus = Math.max(1, Math.floor(allFrames.length / ALL_STATUSES.length));
+      const autoInputs: Record<string, string> = {};
+      const autoPreviews: Record<string, string[]> = {};
+      for (let si = 0; si < ALL_STATUSES.length; si++) {
+        const start = si * perStatus + 1;
+        const end = si === ALL_STATUSES.length - 1
+          ? allFrames.length
+          : Math.min((si + 1) * perStatus, allFrames.length);
+        autoInputs[ALL_STATUSES[si]] = `${start}-${end}`;
+        const indices = parseFrameInput(`${start}-${end}`, allFrames.length);
+        autoPreviews[ALL_STATUSES[si]] = indices.map((i) => getFramePreview(prepared, allFrames[i]));
       }
-      setAssignments(autoAssign as Record<Status, number[]>);
+      setFrameInputs(autoInputs as Record<Status, string>);
+      setPreviewFrames(autoPreviews as Record<Status, string[]>);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load image");
     }
@@ -95,27 +134,41 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
     setCanvas(prepared);
 
     const detected = detectRows(prepared);
-    setRows(detected);
-    const previews = detected.map((row) => getRowPreview(prepared, row));
-    setRowPreviews(previews);
+    const allFrames = extractFrames(detected);
+    setFrames(allFrames);
 
-    const autoAssign: Record<string, number[]> = {};
-    for (const s of ALL_STATUSES) autoAssign[s] = [];
-    const statusOrder: Status[] = ["idle", "busy", "service", "disconnected", "searching", "initializing", "visiting"];
-    for (let i = 0; i < Math.min(detected.length, statusOrder.length); i++) {
-      autoAssign[statusOrder[i]] = [i];
+    // Reset inputs
+    const resetInputs: Record<string, string> = {};
+    const resetPreviews: Record<string, string[]> = {};
+    for (const s of ALL_STATUSES) {
+      resetInputs[s] = "";
+      resetPreviews[s] = [];
     }
-    setAssignments(autoAssign as Record<Status, number[]>);
+    setFrameInputs(resetInputs as Record<Status, string>);
+    setPreviewFrames(resetPreviews as Record<Status, string[]>);
+    setAllFramePreviews([]);
   }, [imgElement]);
 
-  const getStatusForRow = useCallback((rowIndex: number): Status | null => {
-    for (const s of ALL_STATUSES) {
-      if (assignments[s].includes(rowIndex)) return s;
-    }
-    return null;
-  }, [assignments]);
+  const handlePreview = useCallback((status: Status) => {
+    if (!canvas || frames.length === 0) return;
+    const indices = parseFrameInput(frameInputs[status], frames.length);
+    const previews = indices.map((i) => getFramePreview(canvas, frames[i]));
+    setPreviewFrames((prev) => ({ ...prev, [status]: previews }));
+  }, [canvas, frames, frameInputs]);
 
-  const allStatusesAssigned = ALL_STATUSES.every((s) => assignments[s].length > 0);
+  const handleShowAllFrames = useCallback(() => {
+    if (!canvas || frames.length === 0) return;
+    if (allFramePreviews.length === 0) {
+      const previews = frames.map((f) => getFramePreview(canvas, f));
+      setAllFramePreviews(previews);
+    }
+    setShowModal(true);
+  }, [canvas, frames, allFramePreviews]);
+
+  const allStatusesAssigned = ALL_STATUSES.every((s) => {
+    const indices = parseFrameInput(frameInputs[s], frames.length);
+    return indices.length > 0;
+  });
 
   const handleSave = useCallback(async () => {
     if (!canvas || !name.trim() || !allStatusesAssigned) return;
@@ -126,8 +179,8 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
       const blobs: Record<string, { blob: Uint8Array; frames: number }> = {};
 
       for (const status of ALL_STATUSES) {
-        const assignedRows = assignments[status].map((i) => rows[i]);
-        const strip = await createStrip(canvas, assignedRows);
+        const indices = parseFrameInput(frameInputs[status], frames.length);
+        const strip = await createStripFromFrames(canvas, frames, indices);
         blobs[status] = strip;
       }
 
@@ -137,7 +190,7 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
     } finally {
       setProcessing(false);
     }
-  }, [canvas, name, allStatusesAssigned, assignments, rows, onSave]);
+  }, [canvas, name, allStatusesAssigned, frameInputs, frames, onSave]);
 
   return (
     <div className="smart-import">
@@ -177,8 +230,13 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
               <span className="smart-import-file">{fileName}</span>
             </div>
             <div className="settings-row">
-              <span className="settings-row-label">Detected</span>
-              <span className="smart-import-file">{rows.length} rows</span>
+              <span className="settings-row-label">Frames</span>
+              <div className="smart-import-frames-info">
+                <span className="smart-import-file">{frames.length} detected</span>
+                <button className="smart-import-show-all-btn" onClick={handleShowAllFrames}>
+                  Show all
+                </button>
+              </div>
             </div>
             <div className="settings-row">
               <span className="settings-row-label">Background</span>
@@ -219,50 +277,44 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
 
           <div className="settings-card">
             <div className="smart-import-rows-header">
-              <span className="settings-row-label">Assign rows to states</span>
+              <span className="settings-row-label">Assign frames to states</span>
+              <span className="smart-import-hint">e.g. 1-5 or 1,2,3,5,6</span>
             </div>
-            {rows.map((row, i) => {
-              const assignedStatus = getStatusForRow(i);
-              return (
-                <div className="smart-import-row" key={i}>
-                  <div className="smart-import-row-preview">
-                    <img src={rowPreviews[i]} alt={`Row ${i}`} />
+            {ALL_STATUSES.map((status) => (
+              <div className="smart-import-frame-assign" key={status}>
+                <div className="smart-import-frame-header">
+                  <span className="settings-row-label">{STATUS_LABELS[status]}</span>
+                  <div className="smart-import-frame-input-group">
+                    <input
+                      type="text"
+                      className="smart-import-frame-input"
+                      value={frameInputs[status]}
+                      placeholder="1-5"
+                      onChange={(e) => setFrameInputs((prev) => ({ ...prev, [status]: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") handlePreview(status); }}
+                    />
+                    <button
+                      className="smart-import-preview-btn"
+                      onClick={() => handlePreview(status)}
+                    >
+                      Preview
+                    </button>
                   </div>
-                  <div className="smart-import-row-info">
-                    <span className="smart-import-row-label">Row {i + 1}</span>
-                    <span className="smart-import-row-frames">{row.frameCount} frames</span>
-                  </div>
-                  <select
-                    className="smart-import-select"
-                    value={assignedStatus ?? ""}
-                    onChange={(e) => {
-                      const newStatus = e.target.value as Status | "";
-                      // Remove this row from any current assignment
-                      setAssignments((prev) => {
-                        const next = { ...prev };
-                        for (const s of ALL_STATUSES) {
-                          next[s] = next[s].filter((idx) => idx !== i);
-                        }
-                        if (newStatus) {
-                          next[newStatus] = [...next[newStatus], i].sort((a, b) => a - b);
-                        }
-                        return next;
-                      });
-                    }}
-                  >
-                    <option value="">-- skip --</option>
-                    {ALL_STATUSES.map((s) => (
-                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                    ))}
-                  </select>
                 </div>
-              );
-            })}
+                {previewFrames[status].length > 0 && (
+                  <div className="smart-import-frame-previews">
+                    {previewFrames[status].map((src, i) => (
+                      <img key={i} src={src} alt={`Frame ${i}`} className="smart-import-frame-thumb" />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
           {!allStatusesAssigned && (
             <div className="smart-import-warning">
-              Assign at least one row to each status
+              Assign at least one frame to each status
             </div>
           )}
 
@@ -277,6 +329,25 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
             </button>
           </div>
         </>
+      )}
+
+      {showModal && (
+        <div className="smart-import-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="smart-import-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="smart-import-modal-header">
+              <span>All Frames ({frames.length})</span>
+              <button className="smart-import-modal-close" onClick={() => setShowModal(false)}>x</button>
+            </div>
+            <div className="smart-import-modal-grid">
+              {allFramePreviews.map((src, i) => (
+                <div key={i} className="smart-import-modal-frame">
+                  <img src={src} alt={`Frame ${i + 1}`} />
+                  <span className="smart-import-modal-label">{i + 1}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
