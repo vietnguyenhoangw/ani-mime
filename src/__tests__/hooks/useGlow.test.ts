@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { useGlow } from "../../hooks/useGlow";
-import { mockStoreValue } from "../../__mocks__/tauri-store";
+import { mockStoreValue, getMockStore } from "../../__mocks__/tauri-store";
 import { emitMockEvent } from "../../__mocks__/tauri-event";
 import { listen } from "@tauri-apps/api/event";
 
@@ -60,6 +60,11 @@ describe("useGlow", () => {
     });
 
     expect(result.current.mode).toBe("dark");
+
+    // Verify store persistence
+    const store = getMockStore("settings.json");
+    expect(store!.set).toHaveBeenCalledWith("glowMode", "dark");
+    expect(store!.save).toHaveBeenCalled();
   });
 
   it("updates when glow-changed event fires", async () => {

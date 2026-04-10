@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { useScale } from "../../hooks/useScale";
-import { mockStoreValue } from "../../__mocks__/tauri-store";
+import { mockStoreValue, getMockStore } from "../../__mocks__/tauri-store";
 import { emitMockEvent } from "../../__mocks__/tauri-event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -62,6 +62,11 @@ describe("useScale", () => {
       });
 
       expect(result.current.scale).toBe(2);
+
+      // Verify store persistence
+      const store = getMockStore("settings.json");
+      expect(store!.set).toHaveBeenCalledWith("displayScale", 2);
+      expect(store!.save).toHaveBeenCalled();
     });
 
     it("sets CSS custom property --sprite-scale on document.documentElement", async () => {
