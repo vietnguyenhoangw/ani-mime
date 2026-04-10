@@ -1,6 +1,8 @@
 const FRAME_SIZE = 128;
 const BG_TOLERANCE = 30;
 const ALPHA_THRESHOLD = 10;
+const MIN_GAP = 5;
+const MIN_REGION_WIDTH = 10;
 
 export interface DetectedRow {
   index: number;
@@ -139,16 +141,22 @@ export function detectRows(canvas: HTMLCanvasElement): DetectedRow[] {
   return rows;
 }
 
-/** Detect individual sprite columns within a row by finding vertical transparent gaps */
+/** Detect individual sprite columns within a row by finding vertical transparent gaps.
+ *  Tiny gaps (< MIN_GAP px) are bridged so detached parts like projectile tips
+ *  stay merged. Narrow sliver regions (< MIN_REGION_WIDTH px) are absorbed
+ *  into their nearest neighbor. */
 function detectColumns(canvas: HTMLCanvasElement, y1: number, y2: number): { x1: number; x2: number; width: number }[] {
   const ctx = canvas.getContext("2d")!;
   const width = canvas.width;
-  const cols: { x1: number; x2: number; width: number }[] = [];
+  const rowHeight = y2 - y1;
+
+  // Pass 1: detect raw content regions
+  const raw: { x1: number; x2: number }[] = [];
   let inContent = false;
   let colStart = 0;
 
   for (let x = 0; x < width; x++) {
-    const colData = ctx.getImageData(x, y1, 1, y2 - y1).data;
+    const colData = ctx.getImageData(x, y1, 1, rowHeight).data;
     let hasContent = false;
     for (let i = 3; i < colData.length; i += 4) {
       if (colData[i] > ALPHA_THRESHOLD) {
@@ -161,16 +169,55 @@ function detectColumns(canvas: HTMLCanvasElement, y1: number, y2: number): { x1:
       colStart = x;
       inContent = true;
     } else if (!hasContent && inContent) {
-      cols.push({ x1: colStart, x2: x, width: x - colStart });
+      raw.push({ x1: colStart, x2: x });
       inContent = false;
     }
   }
-
   if (inContent) {
-    cols.push({ x1: colStart, x2: width, width: width - colStart });
+    raw.push({ x1: colStart, x2: width });
   }
 
-  return cols;
+  if (raw.length === 0) return [];
+
+  // Pass 2: bridge gaps smaller than MIN_GAP
+  const merged: { x1: number; x2: number }[] = [{ ...raw[0] }];
+  for (let i = 1; i < raw.length; i++) {
+    const prev = merged[merged.length - 1];
+    const gap = raw[i].x1 - prev.x2;
+    if (gap < MIN_GAP) {
+      prev.x2 = raw[i].x2;
+    } else {
+      merged.push({ ...raw[i] });
+    }
+  }
+
+  // Pass 3: absorb narrow slivers into nearest neighbor
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < merged.length; i++) {
+      if (merged[i].x2 - merged[i].x1 < MIN_REGION_WIDTH && merged.length > 1) {
+        if (i === 0) {
+          merged[1].x1 = merged[i].x1;
+        } else if (i === merged.length - 1) {
+          merged[i - 1].x2 = merged[i].x2;
+        } else {
+          const gapLeft = merged[i].x1 - merged[i - 1].x2;
+          const gapRight = merged[i + 1].x1 - merged[i].x2;
+          if (gapLeft <= gapRight) {
+            merged[i - 1].x2 = merged[i].x2;
+          } else {
+            merged[i + 1].x1 = merged[i].x1;
+          }
+        }
+        merged.splice(i, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return merged.map((r) => ({ x1: r.x1, x2: r.x2, width: r.x2 - r.x1 }));
 }
 
 export interface Frame {
@@ -192,7 +239,7 @@ export function extractFrames(rows: DetectedRow[]): Frame[] {
   return frames;
 }
 
-/** Render a single frame as a data URL preview (48px tall) */
+/** Render a single frame as a data URL preview */
 export function getFramePreview(canvas: HTMLCanvasElement, frame: Frame, size: number = 48): string {
   const ctx = canvas.getContext("2d")!;
   const sw = frame.x2 - frame.x1;

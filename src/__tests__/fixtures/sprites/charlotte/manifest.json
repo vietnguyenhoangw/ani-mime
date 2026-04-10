@@ -1,0 +1,300 @@
+{
+  "input": "input.png",
+  "inputSize": {
+    "width": 588,
+    "height": 1744
+  },
+  "totalFrames": 58,
+  "frames": [
+    {
+      "file": "frame_001.png",
+      "width": 66,
+      "height": 117
+    },
+    {
+      "file": "frame_002.png",
+      "width": 78,
+      "height": 117
+    },
+    {
+      "file": "frame_003.png",
+      "width": 68,
+      "height": 141
+    },
+    {
+      "file": "frame_004.png",
+      "width": 68,
+      "height": 141
+    },
+    {
+      "file": "frame_005.png",
+      "width": 80,
+      "height": 117
+    },
+    {
+      "file": "frame_006.png",
+      "width": 95,
+      "height": 117
+    },
+    {
+      "file": "frame_007.png",
+      "width": 98,
+      "height": 118
+    },
+    {
+      "file": "frame_008.png",
+      "width": 102,
+      "height": 119
+    },
+    {
+      "file": "frame_009.png",
+      "width": 106,
+      "height": 110
+    },
+    {
+      "file": "frame_010.png",
+      "width": 111,
+      "height": 109
+    },
+    {
+      "file": "frame_011.png",
+      "width": 111,
+      "height": 119
+    },
+    {
+      "file": "frame_012.png",
+      "width": 100,
+      "height": 119
+    },
+    {
+      "file": "frame_013.png",
+      "width": 104,
+      "height": 119
+    },
+    {
+      "file": "frame_014.png",
+      "width": 98,
+      "height": 111
+    },
+    {
+      "file": "frame_015.png",
+      "width": 94,
+      "height": 103
+    },
+    {
+      "file": "frame_016.png",
+      "width": 84,
+      "height": 98
+    },
+    {
+      "file": "frame_017.png",
+      "width": 81,
+      "height": 96
+    },
+    {
+      "file": "frame_018.png",
+      "width": 98,
+      "height": 117
+    },
+    {
+      "file": "frame_019.png",
+      "width": 95,
+      "height": 134
+    },
+    {
+      "file": "frame_020.png",
+      "width": 94,
+      "height": 114
+    },
+    {
+      "file": "frame_021.png",
+      "width": 102,
+      "height": 98
+    },
+    {
+      "file": "frame_022.png",
+      "width": 102,
+      "height": 98
+    },
+    {
+      "file": "frame_023.png",
+      "width": 73,
+      "height": 117
+    },
+    {
+      "file": "frame_024.png",
+      "width": 146,
+      "height": 113
+    },
+    {
+      "file": "frame_025.png",
+      "width": 138,
+      "height": 113
+    },
+    {
+      "file": "frame_026.png",
+      "width": 177,
+      "height": 98
+    },
+    {
+      "file": "frame_027.png",
+      "width": 72,
+      "height": 118
+    },
+    {
+      "file": "frame_028.png",
+      "width": 63,
+      "height": 117
+    },
+    {
+      "file": "frame_029.png",
+      "width": 173,
+      "height": 115
+    },
+    {
+      "file": "frame_030.png",
+      "width": 172,
+      "height": 114
+    },
+    {
+      "file": "frame_031.png",
+      "width": 129,
+      "height": 109
+    },
+    {
+      "file": "frame_032.png",
+      "width": 180,
+      "height": 117
+    },
+    {
+      "file": "frame_033.png",
+      "width": 100,
+      "height": 125
+    },
+    {
+      "file": "frame_034.png",
+      "width": 197,
+      "height": 125
+    },
+    {
+      "file": "frame_035.png",
+      "width": 85,
+      "height": 125
+    },
+    {
+      "file": "frame_036.png",
+      "width": 99,
+      "height": 118
+    },
+    {
+      "file": "frame_037.png",
+      "width": 125,
+      "height": 106
+    },
+    {
+      "file": "frame_038.png",
+      "width": 101,
+      "height": 110
+    },
+    {
+      "file": "frame_039.png",
+      "width": 81,
+      "height": 87
+    },
+    {
+      "file": "frame_040.png",
+      "width": 133,
+      "height": 119
+    },
+    {
+      "file": "frame_041.png",
+      "width": 133,
+      "height": 112
+    },
+    {
+      "file": "frame_042.png",
+      "width": 64,
+      "height": 136
+    },
+    {
+      "file": "frame_043.png",
+      "width": 133,
+      "height": 138
+    },
+    {
+      "file": "frame_044.png",
+      "width": 78,
+      "height": 103
+    },
+    {
+      "file": "frame_045.png",
+      "width": 77,
+      "height": 98
+    },
+    {
+      "file": "frame_046.png",
+      "width": 119,
+      "height": 95
+    },
+    {
+      "file": "frame_047.png",
+      "width": 115,
+      "height": 102
+    },
+    {
+      "file": "frame_048.png",
+      "width": 118,
+      "height": 54
+    },
+    {
+      "file": "frame_049.png",
+      "width": 117,
+      "height": 48
+    },
+    {
+      "file": "frame_050.png",
+      "width": 117,
+      "height": 45
+    },
+    {
+      "file": "frame_051.png",
+      "width": 82,
+      "height": 116
+    },
+    {
+      "file": "frame_052.png",
+      "width": 63,
+      "height": 117
+    },
+    {
+      "file": "frame_053.png",
+      "width": 80,
+      "height": 117
+    },
+    {
+      "file": "frame_054.png",
+      "width": 80,
+      "height": 117
+    },
+    {
+      "file": "frame_055.png",
+      "width": 80,
+      "height": 116
+    },
+    {
+      "file": "frame_056.png",
+      "width": 157,
+      "height": 85
+    },
+    {
+      "file": "frame_057.png",
+      "width": 80,
+      "height": 117
+    },
+    {
+      "file": "frame_058.png",
+      "width": 80,
+      "height": 117
+    }
+  ]
+}

@@ -345,6 +345,14 @@
   min-width: 90px;
 }
 
+.status-desc {
+  font-size: 10px;
+  opacity: 0.4;
+  margin-top: 1px;
+  max-width: 160px;
+  line-height: 1.3;
+}
+
 .sprite-input-group {
   display: flex;
   align-items: center;
@@ -429,6 +437,10 @@
   background: #0063d1;
 }
 
+.add-cards-row {
+  margin-top: 10px;
+}
+
 .add-card {
   border-style: dashed !important;
   opacity: 0.5;
@@ -452,6 +464,10 @@
 
 .pet-card-wrapper {
   position: relative;
+}
+
+.pet-card-wrapper .pet-card {
+  width: 100%;
 }
 
 .delete-mime-btn {
@@ -665,7 +681,7 @@
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  color: #000;
   font-family: monospace;
   text-align: center;
 }
