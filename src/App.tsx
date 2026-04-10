@@ -27,7 +27,6 @@ function App() {
   const { nickname } = useNickname();
   const { pet } = usePet();
   const { scale } = useScale();
-  const { update, dismiss: dismissUpdate } = useUpdate();
   const devMode = useDevMode();
   useTheme();
 
@@ -79,13 +78,7 @@ function App() {
       onContextMenu={onContextMenu}
     >
       {scenario && <div data-testid="scenario-badge" className="scenario-badge">SCENARIO</div>}
-      {showUpdate && (
-        <UpdateBanner
-          latest={update.latest}
-          onDismiss={dismissUpdate}
-        />
-      )}
-      <SpeechBubble visible={visible && !showUpdate} message={message} onDismiss={dismiss} />
+      <SpeechBubble visible={visible} message={message} onDismiss={dismiss} />
       {status !== "visiting" && <Mascot status={status} />}
       {status === "visiting" && <div style={{ width: 128 * scale, height: 128 * scale }} />}
       <StatusPill status={status} glow={visible} />
