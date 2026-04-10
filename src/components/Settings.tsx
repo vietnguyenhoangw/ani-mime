@@ -12,7 +12,8 @@ import { useCustomMimes, ALL_STATUSES } from "../hooks/useCustomMimes";
 import { SmartImport } from "./SmartImport";
 import type { Status } from "../types/status";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { appDataDir, join } from "@tauri-apps/api/path";
+import { appDataDir, join, resourceDir } from "@tauri-apps/api/path";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { error as logError } from "@tauri-apps/plugin-log";
 import "../styles/settings.css";
 
@@ -80,6 +81,11 @@ export function Settings() {
     return init;
   });
   const [customPreviews, setCustomPreviews] = useState<Record<string, string>>({});
+  const [manualPreviews, setManualPreviews] = useState<Record<Status, string | null>>(() => {
+    const init: any = {};
+    for (const s of ALL_STATUSES) init[s] = null;
+    return init;
+  });
   const [draftNickname, setDraftNickname] = useState(nickname);
   const nicknameChanged = draftNickname !== nickname;
 
@@ -157,6 +163,21 @@ export function Settings() {
     setSpriteInputs((prev) => ({ ...prev, [status]: { ...prev[status], frames: value } }));
   };
 
+  const handleManualPreview = async (status: Status) => {
+    const filePath = spriteInputs[status].path;
+    if (!filePath) return;
+    try {
+      const bytes = await readFile(filePath);
+      const blob = new Blob([bytes], { type: "image/png" });
+      const prev = manualPreviews[status];
+      if (prev) URL.revokeObjectURL(prev);
+      const url = URL.createObjectURL(blob);
+      setManualPreviews((p) => ({ ...p, [status]: url }));
+    } catch (err) {
+      logError(`[settings] failed to preview ${status}: ${err instanceof Error ? err.message : err}`);
+    }
+  };
+
   const handleSaveCustom = async () => {
     const allFilled = ALL_STATUSES.every((s) => spriteInputs[s].path && parseFrameSpec(spriteInputs[s].frames) > 0);
     if (!newName.trim() || !allFilled) return;
@@ -170,6 +191,7 @@ export function Settings() {
     setPet(id);
     setCreating(false);
     setNewName("");
+    clearManualPreviews();
     const init: any = {};
     for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
     setSpriteInputs(init);
@@ -207,6 +229,7 @@ export function Settings() {
     setEditingMime(null);
     setCreating(false);
     setNewName("");
+    clearManualPreviews();
     const init: any = {};
     for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
     setSpriteInputs(init);
@@ -217,10 +240,18 @@ export function Settings() {
     await deleteMime(id);
   };
 
+  const clearManualPreviews = () => {
+    Object.values(manualPreviews).forEach((url) => { if (url) URL.revokeObjectURL(url); });
+    const empty: any = {};
+    for (const s of ALL_STATUSES) empty[s] = null;
+    setManualPreviews(empty);
+  };
+
   const handleCancelCreate = () => {
     setCreating(false);
     setEditingMime(null);
     setNewName("");
+    clearManualPreviews();
     const init: any = {};
     for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
     setSpriteInputs(init);
@@ -380,7 +411,27 @@ export function Settings() {
               );
             })}
             <div className="settings-section">
-              <div className="settings-section-title">Custom</div>
+              <div className="settings-section-title">Create Your Own</div>
+              <p className="settings-section-desc">
+                Import a sprite sheet or pick individual PNGs to build your own mime.{" "}
+                <a
+                  className="settings-link"
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const dir = await resourceDir();
+                      const path = await join(dir, "docs", "custom-mime-guide.pdf");
+                      console.log("[settings] opening guide:", path);
+                      await openPath(path);
+                    } catch (err) {
+                      console.error("[settings] failed to open guide:", err);
+                      logError(`[settings] failed to open guide: ${err instanceof Error ? err.message : err}`);
+                    }
+                  }}
+                >
+                  Read the guide
+                </a>
+              </p>
               {creating === "manual" ? (
                 <div className="custom-creator">
                   <div className="settings-card" style={{ marginBottom: 10 }}>
@@ -399,28 +450,53 @@ export function Settings() {
                   </div>
                   <div className="settings-card">
                     {ALL_STATUSES.map((s) => (
-                      <div className="settings-row" key={s}>
-                        <div>
-                          <span className="settings-row-label status-label">{s}</span>
-                          <div className="status-desc">{STATUS_DESCRIPTIONS[s]}</div>
+                      <div className="manual-status-row" key={s}>
+                        <div className="settings-row">
+                          <div>
+                            <span className="settings-row-label status-label">{s}</span>
+                            <div className="status-desc">{STATUS_DESCRIPTIONS[s]}</div>
+                          </div>
+                          <div className="sprite-input-group">
+                            <button className="sprite-pick-btn" onClick={() => handlePickFile(s)}>
+                              {spriteInputs[s].path
+                                ? spriteInputs[s].path.split("/").pop()
+                                : editingMime
+                                  ? customMimes.find((m) => m.id === editingMime)?.sprites[s]?.fileName ?? "Choose PNG"
+                                  : "Choose PNG"}
+                            </button>
+                            <input
+                              type="text"
+                              className="frame-count-input"
+                              value={spriteInputs[s].frames}
+                              onChange={(e) => handleFrameChange(s, e.target.value)}
+                              placeholder="e.g. 1-5"
+                              title="Frame count or range (e.g. 1-5, 41-55,57,58)"
+                            />
+                            <button
+                              className="manual-preview-btn"
+                              disabled={!spriteInputs[s].path}
+                              onClick={() => handleManualPreview(s)}
+                            >
+                              Preview
+                            </button>
+                          </div>
                         </div>
-                        <div className="sprite-input-group">
-                          <button className="sprite-pick-btn" onClick={() => handlePickFile(s)}>
-                            {spriteInputs[s].path
-                              ? spriteInputs[s].path.split("/").pop()
-                              : editingMime
-                                ? customMimes.find((m) => m.id === editingMime)?.sprites[s]?.fileName ?? "Choose PNG"
-                                : "Choose PNG"}
-                          </button>
-                          <input
-                            type="text"
-                            className="frame-count-input"
-                            value={spriteInputs[s].frames}
-                            onChange={(e) => handleFrameChange(s, e.target.value)}
-                            placeholder="e.g. 1-5"
-                            title="Frame count or range (e.g. 1-5, 41-55,57,58)"
-                          />
-                        </div>
+                        {manualPreviews[s] && (
+                          <div className="manual-preview-strip">
+                            <div
+                              className="manual-preview-sprite"
+                              style={{
+                                backgroundImage: `url(${manualPreviews[s]})`,
+                                width: 48,
+                                height: 48,
+                                backgroundSize: `${parseFrameSpec(spriteInputs[s].frames) * 48}px 48px`,
+                                animationDuration: `${parseFrameSpec(spriteInputs[s].frames) * 80}ms`,
+                                // @ts-expect-error CSS custom property
+                                "--sprite-steps": parseFrameSpec(spriteInputs[s].frames),
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

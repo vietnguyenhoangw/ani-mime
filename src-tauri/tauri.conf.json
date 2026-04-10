@@ -57,7 +57,8 @@
       "script/terminal-mirror.zsh",
       "script/terminal-mirror.bash",
       "script/terminal-mirror.fish",
-      "script/tauri-hook.sh"
+      "script/tauri-hook.sh",
+      "docs/custom-mime-guide.pdf"
     ],
     "active": true,
     "targets": "all",
