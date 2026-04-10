@@ -144,6 +144,20 @@ export const tauriMockScript = `
     // Menu plugin
     if (cmd && cmd.startsWith('plugin:menu|'))  return null;
 
+    // Dialog plugin  ------------------------------------------------------
+    if (cmd === 'plugin:dialog|open') return window.__MOCK_DIALOG_RESULT__ ?? null;
+
+    // FS plugin (in-memory no-ops)  ---------------------------------------
+    if (cmd === 'plugin:fs|exists')     return false;
+    if (cmd === 'plugin:fs|mkdir')      return null;
+    if (cmd === 'plugin:fs|copy_file')  return null;
+    if (cmd === 'plugin:fs|read_file')  return new Uint8Array(0);
+    if (cmd === 'plugin:fs|write_file') return null;
+    if (cmd === 'plugin:fs|remove')     return null;
+
+    // Log plugin  ---------------------------------------------------------
+    if (cmd === 'plugin:log|log') return null;
+
     // Custom app commands
     if (cmd === 'start_visit') return null;
 

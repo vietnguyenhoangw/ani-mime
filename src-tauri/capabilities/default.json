@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
+    "core:window:allow-set-size",
     "core:event:default",
     "opener:default",
     "store:default",

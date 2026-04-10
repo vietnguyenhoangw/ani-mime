@@ -14,7 +14,7 @@
     "windows": [
       {
         "title": "Ani-Mime",
-        "width": 500,
+        "width": 250,
         "height": 220,
         "resizable": false,
         "fullscreen": false,

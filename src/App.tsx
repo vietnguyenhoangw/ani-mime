@@ -13,6 +13,8 @@ import { useNickname } from "./hooks/useNickname";
 import { usePet } from "./hooks/usePet";
 import { useScale } from "./hooks/useScale";
 import { useDevMode } from "./hooks/useDevMode";
+import { useWindowAutoSize } from "./hooks/useWindowAutoSize";
+import { useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import "./styles/theme.css";
@@ -28,7 +30,9 @@ function App() {
   const { pet } = usePet();
   const { scale } = useScale();
   const devMode = useDevMode();
+  const containerRef = useRef<HTMLDivElement>(null);
   useTheme();
+  useWindowAutoSize(containerRef);
 
   const onContextMenu = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -72,6 +76,7 @@ function App() {
 
   return (
     <div
+      ref={containerRef}
       data-testid="app-container"
       className={`container ${dragging ? "dragging" : ""} ${scenario ? "scenario-active" : ""}`}
       onMouseDown={onMouseDown}

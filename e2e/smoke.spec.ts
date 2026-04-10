@@ -223,3 +223,54 @@ test('settings page loads and renders form', async ({ page }) => {
   const title = page.locator('.settings-title');
   await expect(title).toHaveText('General');
 });
+
+// ---------------------------------------------------------------------------
+// 10. Upload Charlotte as custom sprite
+// ---------------------------------------------------------------------------
+test('upload Charlotte as custom sprite via manual flow', async ({ page }) => {
+  await loadWithMock(page, '/settings.html');
+
+  // Navigate to Mime tab
+  await page.click('.sidebar-item:nth-child(2)');
+  await expect(page.locator('.settings-title')).toHaveText('Mime');
+
+  // Click the Manual add card to open the creator form
+  await page.click('.pet-card.add-card:has-text("Manual")');
+  const creator = page.locator('.custom-creator');
+  await expect(creator).toBeVisible();
+
+  // Save should be disabled initially (no name, no files selected)
+  const saveBtn = creator.locator('.creator-btn.save');
+  await expect(saveBtn).toBeDisabled();
+
+  // Enter "Charlotte" as the mime name
+  await creator.locator('.settings-input').fill('Charlotte');
+
+  // Configure mock file dialog to return a fake sprite path
+  await page.evaluate(() => {
+    (window as any).__MOCK_DIALOG_RESULT__ = '/mock/sprites/charlotte.png';
+  });
+
+  // Pick a sprite file for each of the 7 statuses
+  const pickButtons = creator.locator('.sprite-pick-btn');
+  await expect(pickButtons).toHaveCount(7);
+
+  for (let i = 0; i < 7; i++) {
+    await pickButtons.nth(i).click();
+    // Button text changes from "Choose PNG" to the selected filename
+    await expect(pickButtons.nth(i)).toHaveText('charlotte.png');
+  }
+
+  // Save should now be enabled (name filled + all 7 files selected)
+  await expect(saveBtn).toBeEnabled();
+
+  // Save the custom mime
+  await saveBtn.click();
+
+  // The creator form should close
+  await expect(creator).not.toBeVisible();
+
+  // Charlotte should appear in the custom mimes list
+  const charlotteName = page.locator('.pet-card-wrapper .pet-name', { hasText: 'Charlotte' });
+  await expect(charlotteName).toBeVisible();
+});
