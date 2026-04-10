@@ -12,7 +12,7 @@ export interface SpriteConfig {
   frames: number;
 }
 
-export type BuiltinPet = "rottweiler" | "dalmatian" | "samurai" | "hancock" | "genjuro";
+export type BuiltinPet = "rottweiler" | "dalmatian" | "samurai" | "hancock";
 
 // Pet can be a built-in ID or a custom mime ID (e.g. "custom-abc123")
 export type Pet = BuiltinPet | (string & {});

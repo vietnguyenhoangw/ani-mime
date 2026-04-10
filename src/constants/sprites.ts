@@ -61,21 +61,6 @@ export const pets: PetInfo[] = [
       visiting: { file: "HancockSitting.png", frames: 10 },
     },
   },
-  {
-    id: "genjuro",
-    name: "Genjuro",
-    category: "character",
-    preview: "GenjuroIdle.png",
-    sprites: {
-      disconnected: { file: "GenjuroSleep.png", frames: 2 },
-      busy: { file: "GenjuroSniff.png", frames: 8 },
-      service: { file: "GenjuroBark.png", frames: 9 },
-      idle: { file: "GenjuroIdle.png", frames: 6 },
-      searching: { file: "GenjuroSearching.png", frames: 10 },
-      initializing: { file: "GenjuroSearching.png", frames: 10 },
-      visiting: { file: "GenjuroSitting.png", frames: 5 },
-    },
-  },
 ];
 
 export const mimeCategories: { key: MimeCategory; label: string }[] = [

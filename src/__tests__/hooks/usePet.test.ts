@@ -57,9 +57,9 @@ describe("usePet", () => {
     expect(listen).toHaveBeenCalledWith("pet-changed", expect.any(Function));
 
     await act(async () => {
-      emitMockEvent("pet-changed", "genjuro");
+      emitMockEvent("pet-changed", "hancock");
     });
-    expect(result.current.pet).toBe("genjuro");
+    expect(result.current.pet).toBe("hancock");
 
     unmount();
 
@@ -68,6 +68,6 @@ describe("usePet", () => {
       emitMockEvent("pet-changed", "dalmatian");
     });
 
-    expect(result.current.pet).toBe("genjuro");
+    expect(result.current.pet).toBe("hancock");
   });
 });
