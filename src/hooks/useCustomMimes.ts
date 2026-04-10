@@ -3,8 +3,9 @@ import { load } from "@tauri-apps/plugin-store";
 import { emit, listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { copyFile, mkdir, exists, remove, writeFile } from "@tauri-apps/plugin-fs";
-import { appDataDir } from "@tauri-apps/api/path";
+import { appDataDir, join } from "@tauri-apps/api/path";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { info } from "@tauri-apps/plugin-log";
 import type { Status, CustomMimeData } from "../types/status";
 
 const STORE_FILE = "settings.json";
@@ -51,14 +52,16 @@ export function useCustomMimes() {
     const store = await load(STORE_FILE);
     await store.set(STORE_KEY, next);
     await store.save();
+    info(`[custom-mimes] persisted ${next.length} mimes to store`);
     await emit("custom-mimes-changed", next);
   }, []);
 
   const ensureSpritesDir = useCallback(async () => {
     const base = await appDataDir();
-    const dir = `${base}${SPRITES_DIR}`;
+    const dir = await join(base, SPRITES_DIR);
     if (!(await exists(dir))) {
       await mkdir(dir, { recursive: true });
+      info(`[custom-mimes] created sprites dir: ${dir}`);
     }
     return dir;
   }, []);
@@ -77,6 +80,7 @@ export function useCustomMimes() {
       spriteFiles: Record<Status, { sourcePath: string; frames: number }>
     ) => {
       const id = `custom-${Date.now()}`;
+      info(`[custom-mimes] addMime: name="${name}", id=${id}`);
       const dir = await ensureSpritesDir();
 
       const sprites: Record<string, { fileName: string; frames: number }> = {};
@@ -109,6 +113,7 @@ export function useCustomMimes() {
     spriteBlobs: Record<Status, { blob: Uint8Array; frames: number }>
   ) => {
     const id = `custom-${Date.now()}`;
+    info(`[custom-mimes] addMimeFromBlobs: name="${name}", id=${id}`);
     const dir = await ensureSpritesDir();
 
     const sprites: Record<string, { fileName: string; frames: number }> = {};
@@ -116,6 +121,7 @@ export function useCustomMimes() {
       const { blob, frames } = spriteBlobs[status];
       const fileName = `${id}-${status}.png`;
       const destPath = `${dir}/${fileName}`;
+      info(`[custom-mimes] writing ${fileName} (${blob.length} bytes)`);
       await writeFile(destPath, blob);
       sprites[status] = { fileName, frames };
     }
@@ -132,6 +138,7 @@ export function useCustomMimes() {
 
   const deleteMime = useCallback(
     async (id: string) => {
+      info(`[custom-mimes] deleteMime: id=${id}`);
       const mime = mimes.find((m) => m.id === id);
       if (!mime) return;
 
@@ -155,7 +162,8 @@ export function useCustomMimes() {
   const getSpriteUrl = useCallback(
     async (fileName: string): Promise<string> => {
       const base = await appDataDir();
-      return convertFileSrc(`${base}${SPRITES_DIR}/${fileName}`);
+      const filePath = await join(base, SPRITES_DIR, fileName);
+      return convertFileSrc(filePath);
     },
     []
   );

@@ -5,8 +5,9 @@ import { usePet } from "../hooks/usePet";
 import { useGlow } from "../hooks/useGlow";
 import { useScale } from "../hooks/useScale";
 import { useCustomMimes } from "../hooks/useCustomMimes";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { appDataDir } from "@tauri-apps/api/path";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { error as logError } from "@tauri-apps/plugin-log";
 import "../styles/mascot.css";
 
 interface MascotProps {
@@ -36,17 +37,32 @@ export function Mascot({ status }: MascotProps) {
     return () => clearTimeout(timerRef.current);
   }, [status]);
 
-  // Resolve custom sprite URL from filesystem
+  // Resolve custom sprite URL by reading file bytes via FS plugin
   useEffect(() => {
     if (!customMime) {
       setCustomSpriteUrl(null);
       return;
     }
+    let revoked = false;
+    let objectUrl: string | null = null;
     const spriteData = customMime.sprites[status] ?? customMime.sprites.searching;
-    appDataDir().then((base) => {
-      const url = convertFileSrc(`${base}custom-sprites/${spriteData.fileName}`);
-      setCustomSpriteUrl(url);
+    appDataDir().then(async (base) => {
+      try {
+        const filePath = await join(base, "custom-sprites", spriteData.fileName);
+        const bytes = await readFile(filePath);
+        if (revoked) return;
+        const blob = new Blob([bytes], { type: "image/png" });
+        const url = URL.createObjectURL(blob);
+        objectUrl = url;
+        setCustomSpriteUrl(url);
+      } catch (err) {
+        logError(`[mascot] failed to load sprite ${spriteData.fileName}: ${err instanceof Error ? err.message : err}`);
+      }
     });
+    return () => {
+      revoked = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [customMime, status]);
 
   let spriteUrl: string;

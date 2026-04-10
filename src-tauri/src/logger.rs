@@ -15,7 +15,13 @@ pub struct LogEntry {
 static LOG_BUFFER: Mutex<Vec<LogEntry>> = Mutex::new(Vec::new());
 
 pub fn push_log(level: &'static str, msg: String) {
-    eprintln!("[{}] {}", level.to_uppercase(), msg);
+    // Forward to log crate (tauri-plugin-log picks this up → file + stdout + webview)
+    match level {
+        "error" => log::error!("{}", msg),
+        "warn" => log::warn!("{}", msg),
+        _ => log::info!("{}", msg),
+    }
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()

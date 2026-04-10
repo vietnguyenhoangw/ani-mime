@@ -12,6 +12,7 @@ import { resetMocks as resetFs } from "./tauri-fs";
 import { resetMocks as resetDialog } from "./tauri-dialog";
 import { resetMocks as resetOpener } from "./tauri-opener";
 import { resetMocks as resetPath } from "./tauri-path";
+import { resetMocks as resetLog } from "./tauri-log";
 
 beforeEach(() => {
   resetTauri();
@@ -23,4 +24,5 @@ beforeEach(() => {
   resetDialog();
   resetOpener();
   resetPath();
+  resetLog();
 });

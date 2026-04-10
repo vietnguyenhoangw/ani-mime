@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
+import { info, error as logError } from "@tauri-apps/plugin-log";
 import type { Status } from "../types/status";
 import {
   loadImage,
@@ -27,6 +28,16 @@ const STATUS_LABELS: Record<Status, string> = {
   searching: "Searching",
   initializing: "Initializing",
   visiting: "Visiting",
+};
+
+const STATUS_DESCRIPTIONS: Record<Status, string> = {
+  idle: "No commands running — the default resting state",
+  busy: "A terminal command is actively running",
+  service: "A long-running process (e.g. dev server) is active",
+  disconnected: "No terminal sessions connected",
+  searching: "App just launched, looking for terminal sessions",
+  initializing: "First-launch setup in progress",
+  visiting: "A friend's mime is visiting from the local network",
 };
 
 /** Parse "1-5" or "1,2,3,5,6" into 0-based indices. Returns sorted unique indices. */
@@ -123,7 +134,9 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
       setFrameInputs(autoInputs as Record<Status, string>);
       setPreviewFrames(autoPreviews as Record<Status, string[]>);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load image");
+      const msg = err instanceof Error ? err.message : "Failed to load image";
+      logError(`[smart-import] handlePickSheet failed: ${msg}`);
+      setError(msg);
     }
   }, []);
 
@@ -176,6 +189,7 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
     setError(null);
 
     try {
+      info(`[smart-import] saving mime "${name}" with ${ALL_STATUSES.length} statuses`);
       const blobs: Record<string, { blob: Uint8Array; frames: number }> = {};
 
       for (const status of ALL_STATUSES) {
@@ -186,7 +200,9 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
 
       await onSave(name.trim(), blobs as Record<Status, { blob: Uint8Array; frames: number }>);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save mime");
+      const msg = err instanceof Error ? err.message : "Failed to save mime";
+      logError(`[smart-import] handleSave failed: ${msg}`);
+      setError(msg);
     } finally {
       setProcessing(false);
     }
@@ -283,7 +299,10 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
             {ALL_STATUSES.map((status) => (
               <div className="smart-import-frame-assign" key={status}>
                 <div className="smart-import-frame-header">
-                  <span className="settings-row-label">{STATUS_LABELS[status]}</span>
+                  <div>
+                    <span className="settings-row-label">{STATUS_LABELS[status]}</span>
+                    <div className="status-desc">{STATUS_DESCRIPTIONS[status]}</div>
+                  </div>
                   <div className="smart-import-frame-input-group">
                     <input
                       type="text"

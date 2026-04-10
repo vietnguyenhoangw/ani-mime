@@ -2,23 +2,6 @@ import { render, screen, act } from "@testing-library/react";
 import App from "../App";
 import { emitMockEvent } from "../__mocks__/tauri-event";
 
-// Mock @tauri-apps/api/path
-vi.mock("@tauri-apps/api/path", () => ({
-  appDataDir: vi.fn(async () => "/mock/app/data/"),
-}));
-
-// Mock @tauri-apps/api/dpi
-vi.mock("@tauri-apps/api/dpi", () => ({
-  LogicalSize: class LogicalSize {
-    width: number;
-    height: number;
-    constructor(width: number, height: number) {
-      this.width = width;
-      this.height = height;
-    }
-  },
-}));
-
 // Mock hooks to control behavior in integration tests
 const mockUseStatus = vi.fn(() => ({ status: "initializing" as const, scenario: false }));
 vi.mock("../hooks/useStatus", () => ({

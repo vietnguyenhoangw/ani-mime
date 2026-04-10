@@ -2,21 +2,6 @@ import { render, act } from "@testing-library/react";
 import { Mascot } from "../../components/Mascot";
 import type { Status } from "../../types/status";
 
-vi.mock("@tauri-apps/api/path", () => ({
-  appDataDir: vi.fn(async () => "/mock/app/data/"),
-}));
-
-vi.mock("@tauri-apps/api/dpi", () => ({
-  LogicalSize: class LogicalSize {
-    width: number;
-    height: number;
-    constructor(width: number, height: number) {
-      this.width = width;
-      this.height = height;
-    }
-  },
-}));
-
 // Mock hooks used by Mascot
 vi.mock("../../hooks/usePet", () => ({
   usePet: () => ({ pet: "rottweiler", setPet: vi.fn(), loaded: true }),

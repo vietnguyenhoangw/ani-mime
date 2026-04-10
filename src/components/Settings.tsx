@@ -11,9 +11,20 @@ import { useScale } from "../hooks/useScale";
 import { useCustomMimes, ALL_STATUSES } from "../hooks/useCustomMimes";
 import { SmartImport } from "./SmartImport";
 import type { Status } from "../types/status";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { appDataDir } from "@tauri-apps/api/path";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { error as logError } from "@tauri-apps/plugin-log";
 import "../styles/settings.css";
+
+const STATUS_DESCRIPTIONS: Record<Status, string> = {
+  idle: "No commands running — the default resting state",
+  busy: "A terminal command is actively running",
+  service: "A long-running process (e.g. dev server) is active",
+  disconnected: "No terminal sessions connected",
+  searching: "App just launched, looking for terminal sessions",
+  initializing: "First-launch setup in progress",
+  visiting: "A friend's mime is visiting from the local network",
+};
 
 type Tab = "general" | "mime" | "about";
 
@@ -49,18 +60,34 @@ export function Settings() {
     setDraftNickname(nickname);
   }, [nickname]);
   useEffect(() => {
+    let cancelled = false;
+    const urls: string[] = [];
     const loadPreviews = async () => {
       const base = await appDataDir();
       const previews: Record<string, string> = {};
       for (const mime of customMimes) {
         const idleSprite = mime.sprites.idle;
         if (idleSprite) {
-          previews[mime.id] = convertFileSrc(`${base}custom-sprites/${idleSprite.fileName}`);
+          try {
+            const filePath = await join(base, "custom-sprites", idleSprite.fileName);
+            const bytes = await readFile(filePath);
+            if (cancelled) return;
+            const blob = new Blob([bytes], { type: "image/png" });
+            const url = URL.createObjectURL(blob);
+            urls.push(url);
+            previews[mime.id] = url;
+          } catch (err) {
+            logError(`[settings] failed to load preview for ${mime.id}: ${err instanceof Error ? err.message : err}`);
+          }
         }
       }
-      setCustomPreviews(previews);
+      if (!cancelled) setCustomPreviews(previews);
     };
     loadPreviews();
+    return () => {
+      cancelled = true;
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
   }, [customMimes]);
 
   const [devMode, setDevMode] = useState(false);
@@ -308,7 +335,10 @@ export function Settings() {
                   <div className="settings-card">
                     {ALL_STATUSES.map((s) => (
                       <div className="settings-row" key={s}>
-                        <span className="settings-row-label status-label">{s}</span>
+                        <div>
+                          <span className="settings-row-label status-label">{s}</span>
+                          <div className="status-desc">{STATUS_DESCRIPTIONS[s]}</div>
+                        </div>
                         <div className="sprite-input-group">
                           <button className="sprite-pick-btn" onClick={() => handlePickFile(s)}>
                             {spriteInputs[s].path
@@ -351,43 +381,49 @@ export function Settings() {
                   onCancel={handleCancelCreate}
                 />
               ) : (
-                <div className="pet-grid">
-                  {customMimes.map((m) => (
-                    <div key={m.id} className="pet-card-wrapper">
-                      <button
-                        className={`pet-card ${pet === m.id ? "active" : ""}`}
-                        onClick={() => setPet(m.id)}
-                      >
-                        <div
-                          className="pet-preview"
-                          style={{
-                            backgroundImage: customPreviews[m.id] ? `url(${customPreviews[m.id]})` : "none",
-                            backgroundSize: "auto 48px",
-                            backgroundPosition: "0 0",
-                            backgroundRepeat: "no-repeat",
-                            imageRendering: "pixelated",
-                          }}
-                        />
-                        <span className="pet-name">{m.name}</span>
-                      </button>
-                      <button
-                        className="delete-mime-btn"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteCustom(m.id); }}
-                        title="Delete"
-                      >
-                        x
-                      </button>
+                <>
+                  {customMimes.length > 0 && (
+                    <div className="pet-grid">
+                      {customMimes.map((m) => (
+                        <div key={m.id} className="pet-card-wrapper">
+                          <button
+                            className={`pet-card ${pet === m.id ? "active" : ""}`}
+                            onClick={() => setPet(m.id)}
+                          >
+                            <div
+                              className="pet-preview"
+                              style={{
+                                backgroundImage: customPreviews[m.id] ? `url(${customPreviews[m.id]})` : "none",
+                                backgroundSize: "auto 48px",
+                                backgroundPosition: "0 0",
+                                backgroundRepeat: "no-repeat",
+                                imageRendering: "pixelated",
+                              }}
+                            />
+                            <span className="pet-name">{m.name}</span>
+                          </button>
+                          <button
+                            className="delete-mime-btn"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteCustom(m.id); }}
+                            title="Delete"
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  <button className="pet-card add-card" onClick={() => setCreating("manual")}>
-                    <div className="add-icon">+</div>
-                    <span className="pet-name">Manual</span>
-                  </button>
-                  <button className="pet-card add-card" onClick={() => setCreating("smart")}>
-                    <div className="add-icon">*</div>
-                    <span className="pet-name">Import</span>
-                  </button>
-                </div>
+                  )}
+                  <div className="pet-grid add-cards-row">
+                    <button className="pet-card add-card" onClick={() => setCreating("manual")}>
+                      <div className="add-icon">+</div>
+                      <span className="pet-name">Manual</span>
+                    </button>
+                    <button className="pet-card add-card" onClick={() => setCreating("smart")}>
+                      <div className="add-icon">*</div>
+                      <span className="pet-name">Import</span>
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </>

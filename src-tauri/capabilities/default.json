@@ -21,6 +21,7 @@
     "fs:allow-copy-file",
     "fs:allow-remove",
     "fs:read-all",
-    "fs:scope-appdata-recursive"
+    "fs:scope-appdata-recursive",
+    "log:default"
   ]
 }
