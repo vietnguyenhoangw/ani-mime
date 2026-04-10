@@ -67,9 +67,10 @@ export function Settings() {
   const { mode: glowMode, setMode: setGlowMode } = useGlow();
   const { nickname, setNickname } = useNickname();
   const { scale, setScale, SCALE_PRESETS } = useScale();
-  const { mimes: customMimes, pickSpriteFile, addMime, addMimeFromBlobs, deleteMime } = useCustomMimes();
+  const { mimes: customMimes, pickSpriteFile, addMime, addMimeFromBlobs, updateMime, deleteMime } = useCustomMimes();
   const [tab, setTab] = useState<Tab>("general");
   const [creating, setCreating] = useState<false | "manual" | "smart">(false);
+  const [editingMime, setEditingMime] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [spriteInputs, setSpriteInputs] = useState<
     Record<Status, { path: string; frames: string }>
@@ -174,6 +175,43 @@ export function Settings() {
     setSpriteInputs(init);
   };
 
+  const handleEditCustom = (id: string) => {
+    const mime = customMimes.find((m) => m.id === id);
+    if (!mime) return;
+    setEditingMime(id);
+    setCreating("manual");
+    setNewName(mime.name);
+    const filled: any = {};
+    for (const s of ALL_STATUSES) {
+      filled[s] = { path: "", frames: String(mime.sprites[s].frames) };
+    }
+    setSpriteInputs(filled);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMime) return;
+    const allValid = ALL_STATUSES.every(
+      (s) => (spriteInputs[s].path || editingMime) && parseFrameSpec(spriteInputs[s].frames) > 0
+    );
+    if (!newName.trim() || !allValid) return;
+
+    const spriteFiles: Record<Status, { sourcePath: string | null; frames: number }> = {} as any;
+    for (const s of ALL_STATUSES) {
+      spriteFiles[s] = {
+        sourcePath: spriteInputs[s].path || null,
+        frames: parseFrameSpec(spriteInputs[s].frames),
+      };
+    }
+
+    await updateMime(editingMime, newName.trim(), spriteFiles);
+    setEditingMime(null);
+    setCreating(false);
+    setNewName("");
+    const init: any = {};
+    for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
+    setSpriteInputs(init);
+  };
+
   const handleDeleteCustom = async (id: string) => {
     if (pet === id) setPet("rottweiler");
     await deleteMime(id);
@@ -181,6 +219,7 @@ export function Settings() {
 
   const handleCancelCreate = () => {
     setCreating(false);
+    setEditingMime(null);
     setNewName("");
     const init: any = {};
     for (const s of ALL_STATUSES) init[s] = { path: "", frames: "1" };
@@ -369,7 +408,9 @@ export function Settings() {
                           <button className="sprite-pick-btn" onClick={() => handlePickFile(s)}>
                             {spriteInputs[s].path
                               ? spriteInputs[s].path.split("/").pop()
-                              : "Choose PNG"}
+                              : editingMime
+                                ? customMimes.find((m) => m.id === editingMime)?.sprites[s]?.fileName ?? "Choose PNG"
+                                : "Choose PNG"}
                           </button>
                           <input
                             type="text"
@@ -389,8 +430,13 @@ export function Settings() {
                     </button>
                     <button
                       className="creator-btn save"
-                      onClick={handleSaveCustom}
-                      disabled={!newName.trim() || !ALL_STATUSES.every((s) => spriteInputs[s].path && parseFrameSpec(spriteInputs[s].frames) > 0)}
+                      onClick={editingMime ? handleSaveEdit : handleSaveCustom}
+                      disabled={
+                        !newName.trim() ||
+                        !ALL_STATUSES.every((s) =>
+                          (spriteInputs[s].path || editingMime) && parseFrameSpec(spriteInputs[s].frames) > 0
+                        )
+                      }
                     >
                       Save
                     </button>
@@ -426,6 +472,14 @@ export function Settings() {
                               }}
                             />
                             <span className="pet-name">{m.name}</span>
+                          </button>
+                          <button
+                            className="edit-mime-btn"
+                            onClick={(e) => { e.stopPropagation(); handleEditCustom(m.id); }}
+                            title="Edit"
+                            data-testid={`edit-mime-${m.id}`}
+                          >
+                            &#9998;
                           </button>
                           <button
                             className="delete-mime-btn"

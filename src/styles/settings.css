@@ -470,6 +470,26 @@
   width: 100%;
 }
 
+.edit-mime-btn {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: #007aff;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-family: inherit;
+}
+
 .delete-mime-btn {
   position: absolute;
   top: -4px;
@@ -490,6 +510,7 @@
   font-family: inherit;
 }
 
+.pet-card-wrapper:hover .edit-mime-btn,
 .pet-card-wrapper:hover .delete-mime-btn {
   display: flex;
 }

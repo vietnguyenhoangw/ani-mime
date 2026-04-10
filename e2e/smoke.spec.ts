@@ -323,3 +323,79 @@ test('Charlotte sprite renders at tiny size (64×64) on main page', async ({ pag
   await expect(sprite).toHaveCSS('width', '64px');
   await expect(sprite).toHaveCSS('height', '64px');
 });
+
+// ---------------------------------------------------------------------------
+// 12. Edit Charlotte: rename and change busy frame range
+// ---------------------------------------------------------------------------
+test('edit Charlotte sprite: rename and change busy frame range', async ({ page }) => {
+  await loadWithMock(page, '/settings.html');
+
+  // Navigate to Mime tab
+  await page.click('.sidebar-item:nth-child(2)');
+  await expect(page.locator('.settings-title')).toHaveText('Mime');
+
+  // Inject Charlotte into custom mimes via event
+  await page.evaluate(() => {
+    (window as any).__TEST_EMIT__('custom-mimes-changed', [{
+      id: 'custom-12345',
+      name: 'Charlotte',
+      sprites: {
+        idle:          { fileName: 'custom-12345-idle.png',          frames: 5 },
+        busy:          { fileName: 'custom-12345-busy.png',          frames: 8 },
+        service:       { fileName: 'custom-12345-service.png',       frames: 3 },
+        disconnected:  { fileName: 'custom-12345-disconnected.png',  frames: 1 },
+        searching:     { fileName: 'custom-12345-searching.png',     frames: 17 },
+        initializing:  { fileName: 'custom-12345-initializing.png',  frames: 4 },
+        visiting:      { fileName: 'custom-12345-visiting.png',      frames: 6 },
+      },
+    }]);
+  });
+
+  // Charlotte should appear in the custom section
+  await expect(page.locator('.pet-card-wrapper .pet-name', { hasText: 'Charlotte' })).toBeVisible();
+
+  // Hover the card to reveal the edit button, then click it
+  const charlotteWrapper = page.locator('.pet-card-wrapper', { has: page.locator('.pet-name', { hasText: 'Charlotte' }) });
+  await charlotteWrapper.hover();
+  await page.click('[data-testid="edit-mime-custom-12345"]');
+
+  // The creator form should open with Charlotte's data pre-filled
+  const creator = page.locator('.custom-creator');
+  await expect(creator).toBeVisible();
+
+  // Name should be pre-filled with "Charlotte"
+  const nameInput = creator.locator('.settings-input');
+  await expect(nameInput).toHaveValue('Charlotte');
+
+  // Frame inputs should be pre-filled from existing data
+  const frameInputs = creator.locator('.frame-count-input');
+  await expect(frameInputs.nth(0)).toHaveValue('5');   // idle
+  await expect(frameInputs.nth(1)).toHaveValue('8');   // busy
+
+  // Sprite buttons should show existing file names (not "Choose PNG")
+  const pickButtons = creator.locator('.sprite-pick-btn');
+  await expect(pickButtons.nth(1)).toHaveText('custom-12345-busy.png');
+
+  // --- Make edits ---
+
+  // Rename to "Charlotte v2"
+  await nameInput.fill('Charlotte v2');
+
+  // Change busy frames from "8" to "1-10"
+  await frameInputs.nth(1).fill('1-10');
+
+  // Save should be enabled (existing files carry over when editing)
+  const saveBtn = creator.locator('.creator-btn.save');
+  await expect(saveBtn).toBeEnabled();
+
+  // Save
+  await saveBtn.click();
+
+  // The creator form should close
+  await expect(creator).not.toBeVisible();
+
+  // The updated name should appear; the old name should not
+  const allNames = await page.locator('.pet-card-wrapper .pet-name').allTextContents();
+  expect(allNames).toContain('Charlotte v2');
+  expect(allNames).not.toContain('Charlotte');
+});

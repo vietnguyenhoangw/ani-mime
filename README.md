@@ -43,6 +43,9 @@ It also integrates with **Claude Code** — the dog knows when Claude is thinkin
 ## Features
 
 - **Pixel Art Mascot** — animated sprite sheet dog above the status pill
+- **Custom Sprites** — upload your own PNG sprite sheets via manual import or smart extraction with chroma-key background removal
+- **Frame Range Expressions** — specify frames as ranges like `1-5` or `41-55,57,58` when importing custom sprites
+- **Display Scale** — resize your mascot with Tiny / Normal / Large / XL presets
 - **Manual Tagging** — zsh hooks classify commands as `task` or `service`
 - **Heartbeat Architecture** — no process tree scanning, no time-based guessing
 - **Claude Code Hooks** — tracks when Claude is actively working vs waiting
@@ -94,10 +97,25 @@ source ~/.zshrc
 
 ## Tech Stack
 
-- **Frontend:** React, TypeScript, Vite
+- **Frontend:** React 19, TypeScript, Vite
 - **Backend:** Rust, Tauri v2, tiny_http
 - **Shell:** zsh hooks (preexec / precmd)
-- **Sprites:** CSS sprite sheet animation (64x64 pixel art)
+- **Sprites:** CSS sprite sheet animation (128×128 pixel art, scalable)
+- **Testing:** Vitest (unit), Playwright (e2e)
+
+---
+
+## Testing
+
+```bash
+# Unit tests
+bun run test
+
+# E2E tests (requires dev server on :1420)
+npx playwright test --config=e2e/playwright.config.ts
+```
+
+The e2e suite covers app startup, status transitions, speech bubbles, scenario mode, settings, custom sprite upload (including frame range expressions), sprite display sizing, and custom sprite editing.
 
 ---
 

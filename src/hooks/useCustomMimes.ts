@@ -136,6 +136,43 @@ export function useCustomMimes() {
     return id;
   }, [mimes, saveMimes, ensureSpritesDir]);
 
+  const updateMime = useCallback(
+    async (
+      id: string,
+      name: string,
+      spriteFiles: Record<Status, { sourcePath: string | null; frames: number }>
+    ) => {
+      const existing = mimes.find((m) => m.id === id);
+      if (!existing) return;
+
+      info(`[custom-mimes] updateMime: id=${id}, name="${name}"`);
+      const dir = await ensureSpritesDir();
+
+      const sprites: Record<string, { fileName: string; frames: number }> = {};
+      for (const status of ALL_STATUSES) {
+        const { sourcePath, frames } = spriteFiles[status];
+        if (sourcePath) {
+          const ext = sourcePath.split(".").pop() ?? "png";
+          const fileName = `${id}-${status}.${ext}`;
+          const destPath = `${dir}/${fileName}`;
+          await copyFile(sourcePath, destPath);
+          sprites[status] = { fileName, frames };
+        } else {
+          sprites[status] = { fileName: existing.sprites[status].fileName, frames };
+        }
+      }
+
+      const updated: CustomMimeData = {
+        id,
+        name,
+        sprites: sprites as Record<Status, { fileName: string; frames: number }>,
+      };
+
+      await saveMimes(mimes.map((m) => (m.id === id ? updated : m)));
+    },
+    [mimes, saveMimes, ensureSpritesDir]
+  );
+
   const deleteMime = useCallback(
     async (id: string) => {
       info(`[custom-mimes] deleteMime: id=${id}`);
@@ -168,5 +205,5 @@ export function useCustomMimes() {
     []
   );
 
-  return { mimes, loaded, pickSpriteFile, addMime, addMimeFromBlobs, deleteMime, getSpriteUrl };
+  return { mimes, loaded, pickSpriteFile, addMime, addMimeFromBlobs, updateMime, deleteMime, getSpriteUrl };
 }
