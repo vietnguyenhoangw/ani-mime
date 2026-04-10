@@ -606,6 +606,16 @@
   opacity: 0.8;
 }
 
+.smart-import-error {
+  font-size: 11px;
+  color: #ff3b30;
+  text-align: center;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: rgba(255, 59, 48, 0.1);
+  border-radius: 6px;
+}
+
 .add-icon-img {
   font-size: 20px;
   width: 48px;

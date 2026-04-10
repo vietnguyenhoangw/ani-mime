@@ -42,40 +42,45 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
   const [fileName, setFileName] = useState("");
   const [bgColor, setBgColor] = useState<BgColor | null>(null);
   const [imgElement, setImgElement] = useState<HTMLImageElement | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePickSheet = useCallback(async () => {
-    const result = await open({
-      multiple: false,
-      filters: [{ name: "Sprite Sheet", extensions: ["png", "gif", "jpg", "jpeg"] }],
-    });
-    if (!result) return;
+    setError(null);
+    try {
+      const result = await open({
+        multiple: false,
+        filters: [{ name: "Sprite Sheet", extensions: ["png", "gif", "jpg", "jpeg"] }],
+      });
+      if (!result) return;
 
-    setFileName(result.split("/").pop() ?? "");
-    const src = convertFileSrc(result);
-    const img = await loadImage(src);
-    setImgElement(img);
-    const { canvas: prepared, bgColor: detectedBg } = prepareCanvas(img);
-    setBgColor(detectedBg);
-    setCanvas(prepared);
+      setFileName(result.split("/").pop() ?? "");
+      const src = convertFileSrc(result);
+      const img = await loadImage(src);
+      setImgElement(img);
+      const { canvas: prepared, bgColor: detectedBg } = prepareCanvas(img);
+      setBgColor(detectedBg);
+      setCanvas(prepared);
 
-    const detected = detectRows(prepared);
-    setRows(detected);
+      const detected = detectRows(prepared);
+      if (detected.length === 0) {
+        setError("No sprite rows detected. Try a different image or background color.");
+        return;
+      }
+      setRows(detected);
 
-    // Generate previews for each row
-    const previews = detected.map((row) => getRowPreview(prepared, row));
-    setRowPreviews(previews);
+      const previews = detected.map((row) => getRowPreview(prepared, row));
+      setRowPreviews(previews);
 
-    // Auto-assign rows to statuses in order
-    const autoAssign: Record<string, number[]> = {};
-    for (const s of ALL_STATUSES) autoAssign[s] = [];
-
-    // Map first N rows to statuses, remaining rows unassigned
-    const statusOrder: Status[] = ["idle", "busy", "service", "disconnected", "searching", "initializing", "visiting"];
-    for (let i = 0; i < Math.min(detected.length, statusOrder.length); i++) {
-      autoAssign[statusOrder[i]] = [i];
+      const autoAssign: Record<string, number[]> = {};
+      for (const s of ALL_STATUSES) autoAssign[s] = [];
+      const statusOrder: Status[] = ["idle", "busy", "service", "disconnected", "searching", "initializing", "visiting"];
+      for (let i = 0; i < Math.min(detected.length, statusOrder.length); i++) {
+        autoAssign[statusOrder[i]] = [i];
+      }
+      setAssignments(autoAssign as Record<Status, number[]>);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load image");
     }
-
-    setAssignments(autoAssign as Record<Status, number[]>);
   }, []);
 
   const reprocessWithColor = useCallback((newColor: BgColor) => {
@@ -110,6 +115,7 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
   const handleSave = useCallback(async () => {
     if (!canvas || !name.trim() || !allStatusesAssigned) return;
     setProcessing(true);
+    setError(null);
 
     try {
       const blobs: Record<string, { blob: Uint8Array; frames: number }> = {};
@@ -121,6 +127,8 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
       }
 
       await onSave(name.trim(), blobs as Record<Status, { blob: Uint8Array; frames: number }>);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save mime");
     } finally {
       setProcessing(false);
     }
@@ -128,6 +136,9 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
 
   return (
     <div className="smart-import">
+      {error && (
+        <div className="smart-import-error">{error}</div>
+      )}
       {!canvas ? (
         <div className="smart-import-pick">
           <div className="settings-card">
@@ -136,6 +147,9 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
               <span>Choose a sprite sheet</span>
               <span className="smart-import-hint">PNG, GIF, or JPG</span>
             </div>
+          </div>
+          <div className="custom-creator-actions">
+            <button className="creator-btn cancel" onClick={onCancel}>Cancel</button>
           </div>
         </div>
       ) : (
