@@ -66,6 +66,32 @@ When multiple terminals are open, the UI shows one winner: `busy > service > idl
 - Setup marker file: `~/.ani-mime/setup-done`
 - macOS-only: uses `cocoa` + `objc` crates for window transparency (behind `#[cfg(target_os = "macos")]`)
 
+## Testing
+
+### Automation-Friendly UI
+
+Every interactive or observable UI element must be locatable by automated tests without coupling to styling or DOM structure.
+
+- **Always add `data-testid`** to any element that a test might need to find — buttons, inputs, status indicators, containers, cards, toggles, labels. When in doubt, add one.
+- **Naming**: `data-testid="section-element"` (e.g., `settings-tab-appearance`, `pet-card-shiba`, `creator-save-btn`). Use kebab-case. Parameterize with dynamic values where appropriate (`pet-card-${id}`).
+- **Semantic HTML first**: Use `<button>`, `<input>`, `<nav>`, `<main>`, `<label>` — not styled `<div>`s. This enables `getByRole()` locators.
+- **ARIA attributes**: Add `aria-label` on icon-only buttons, `role="switch"` + `aria-checked` on toggles, and `htmlFor` on `<label>` elements. These serve both accessibility and testability.
+- **Never rely on CSS classes or DOM position for test selectors.** Selectors like `.sidebar-item:nth-child(2)` break when styling or order changes.
+
+### Selector Priority (for both unit and e2e tests)
+
+1. `getByRole()` — preferred, tests what users see
+2. `getByTestId()` / `[data-testid="..."]` — explicit, stable
+3. `getByText()` / `getByPlaceholderText()` — acceptable for unique visible text
+4. **Avoid**: `container.querySelector(".class")`, CSS class selectors, `:nth-child()`
+
+### Test Structure
+
+- **Unit tests** (Vitest + React Testing Library): `src/**/*.test.{ts,tsx}`
+- **E2E tests** (Playwright): `e2e/*.spec.ts`
+- **Run e2e**: `bunx playwright test`
+- **Playwright config**: `e2e/playwright.config.ts` — chromium + webkit, trace on failure
+
 ## Adding Features
 
 - **New UI state**: Update `Status` type → `sprites.ts` → `StatusPill.tsx` → `status-pill.css` → `resolve_ui_state()` in `state.rs`
