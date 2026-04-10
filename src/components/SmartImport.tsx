@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { readFile } from "@tauri-apps/plugin-fs";
 import type { Status } from "../types/status";
 import {
   loadImage,
@@ -54,8 +54,13 @@ export function SmartImport({ onSave, onCancel }: SmartImportProps) {
       if (!result) return;
 
       setFileName(result.split("/").pop() ?? "");
-      const src = convertFileSrc(result);
+      const bytes = await readFile(result);
+      const ext = result.split(".").pop()?.toLowerCase() ?? "png";
+      const mime = ext === "gif" ? "image/gif" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+      const blob = new Blob([bytes], { type: mime });
+      const src = URL.createObjectURL(blob);
       const img = await loadImage(src);
+      URL.revokeObjectURL(src);
       setImgElement(img);
       const { canvas: prepared, bgColor: detectedBg } = prepareCanvas(img);
       setBgColor(detectedBg);
