@@ -14,8 +14,8 @@ const SCALE_PRESETS: DisplayScale[] = [0.5, 1, 1.5, 2];
 const WINDOW_SIZES: Record<number, { width: number; height: number }> = {
   0.5: { width: 300, height: 140 },
   1: { width: 500, height: 220 },
-  1.5: { width: 500, height: 280 },
-  2: { width: 500, height: 350 },
+  1.5: { width: 400, height: 280 },
+  2: { width: 450, height: 350 },
 };
 
 function applyScale(scale: number) {

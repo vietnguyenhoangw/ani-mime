@@ -1,9 +1,9 @@
-import { render, screen, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import App from "../App";
-import { emitMockEvent } from "../__mocks__/tauri-event";
+import type { Status } from "../types/status";
 
 // Mock hooks to control behavior in integration tests
-const mockUseStatus = vi.fn(() => ({ status: "initializing" as const, scenario: false }));
+const mockUseStatus = vi.fn((): { status: Status; scenario: boolean } => ({ status: "initializing", scenario: false }));
 vi.mock("../hooks/useStatus", () => ({
   useStatus: () => mockUseStatus(),
 }));

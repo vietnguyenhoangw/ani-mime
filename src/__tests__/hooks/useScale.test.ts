@@ -85,16 +85,17 @@ describe("useScale", () => {
       await act(async () => {});
 
       const mockWin = getCurrentWindow();
-      mockWin.setSize.mockClear();
+      const setSizeMock = mockWin.setSize as ReturnType<typeof vi.fn>;
+      setSizeMock.mockClear();
 
       await act(async () => {
         await result.current.setScale(1.5);
       });
 
-      expect(mockWin.setSize).toHaveBeenCalledTimes(1);
-      const sizeArg = mockWin.setSize.mock.calls[0][0];
-      expect(sizeArg.width).toBe(700);
-      expect(sizeArg.height).toBe(300);
+      expect(setSizeMock).toHaveBeenCalledTimes(1);
+      const sizeArg = setSizeMock.mock.calls[0][0];
+      expect(sizeArg.width).toBe(400);
+      expect(sizeArg.height).toBe(280);
     });
   });
 });
