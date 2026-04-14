@@ -167,26 +167,13 @@ fn preview_dialog(dialog_id: String, app: tauri::AppHandle) {
 
 #[tauri::command]
 fn request_local_network() {
-    crate::app_log!("[app] request_local_network permission trigger");
-    // Attempt an mDNS browse — this triggers the macOS Local Network permission prompt
-    // if the user hasn't been asked yet. If already denied, open System Preferences.
-    std::thread::spawn(|| {
-        match mdns_sd::ServiceDaemon::new() {
-            Ok(mdns) => {
-                let _ = mdns.browse("_ani-mime._tcp.local.");
-                // Keep daemon alive briefly so the OS has time to show the prompt
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                let _ = mdns.shutdown();
-                crate::app_log!("[app] local network permission probe completed");
-            }
-            Err(e) => {
-                crate::app_warn!("[app] mDNS probe failed ({}), opening System Preferences", e);
-                let _ = std::process::Command::new("open")
-                    .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")
-                    .spawn();
-            }
-        }
-    });
+    crate::app_log!("[app] opening System Settings > Local Network");
+    // mDNS discovery already runs at startup, which triggers the macOS permission
+    // prompt on first access. If the user denied it, the only way to re-enable is
+    // through System Settings — open it directly.
+    let _ = std::process::Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")
+        .spawn();
 }
 
 #[tauri::command]
