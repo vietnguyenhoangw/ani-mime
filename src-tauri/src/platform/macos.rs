@@ -1,5 +1,63 @@
 use tauri::Manager;
 
+/// Trigger macOS Local Network permission dialog via Apple's DNS-SD API.
+///
+/// The `mdns-sd` crate uses raw UDP sockets which bypass Apple's Bonjour framework,
+/// so macOS never prompts for Local Network permission. This function calls Apple's
+/// native `DNSServiceBrowse` (part of libSystem) to trigger the prompt. Should be
+/// called once at startup before `mdns-sd` begins.
+pub fn trigger_local_network_prompt() {
+    use std::ffi::CString;
+    use std::os::raw::{c_char, c_void};
+
+    type DNSServiceRef = *mut c_void;
+
+    extern "C" fn noop_callback(
+        _: DNSServiceRef, _: u32, _: u32, _: i32,
+        _: *const c_char, _: *const c_char, _: *const c_char, _: *mut c_void,
+    ) {}
+
+    extern "C" {
+        fn DNSServiceBrowse(
+            sdRef: *mut DNSServiceRef,
+            flags: u32,
+            interfaceIndex: u32,
+            regtype: *const c_char,
+            domain: *const c_char,
+            callBack: extern "C" fn(
+                DNSServiceRef, u32, u32, i32,
+                *const c_char, *const c_char, *const c_char, *mut c_void,
+            ),
+            context: *mut c_void,
+        ) -> i32;
+        fn DNSServiceRefDeallocate(sdRef: DNSServiceRef);
+    }
+
+    let regtype = CString::new("_ani-mime._tcp").unwrap();
+    let mut sd_ref: DNSServiceRef = std::ptr::null_mut();
+
+    unsafe {
+        let err = DNSServiceBrowse(
+            &mut sd_ref,
+            0,
+            0,
+            regtype.as_ptr(),
+            std::ptr::null(),
+            noop_callback,
+            std::ptr::null_mut(),
+        );
+
+        if err == 0 && !sd_ref.is_null() {
+            crate::app_log!("[platform] DNS-SD browse initiated — Local Network prompt should appear");
+            // Keep the connection alive briefly so macOS registers the access
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            DNSServiceRefDeallocate(sd_ref);
+        } else {
+            crate::app_warn!("[platform] DNS-SD browse failed (err={}), Local Network prompt may not appear", err);
+        }
+    }
+}
+
 /// Toggle dock icon visibility at runtime.
 /// `visible = false` → Accessory (no dock, no Cmd+Tab)
 /// `visible = true`  → Regular (normal dock app)

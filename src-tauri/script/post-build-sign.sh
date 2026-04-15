@@ -49,7 +49,11 @@ if [ -n "$TARGET" ]; then
     *)        ARCH=$(uname -m) ;;
   esac
 else
-  ARCH=$(uname -m)
+  RAW_ARCH=$(uname -m)
+  case "$RAW_ARCH" in
+    arm64) ARCH="aarch64" ;;
+    *)     ARCH="$RAW_ARCH" ;;
+  esac
 fi
 DMG_NAME="ani-mime_${VERSION}_${ARCH}.dmg"
 DMG_PATH="$DMG_DIR/$DMG_NAME"

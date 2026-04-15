@@ -167,10 +167,15 @@ fn preview_dialog(dialog_id: String, app: tauri::AppHandle) {
 
 #[tauri::command]
 fn request_local_network() {
-    crate::app_log!("[app] opening System Settings > Local Network");
-    // mDNS discovery already runs at startup, which triggers the macOS permission
-    // prompt on first access. If the user denied it, the only way to re-enable is
-    // through System Settings — open it directly.
+    crate::app_log!("[app] requesting Local Network permission");
+    // Trigger the Bonjour API — if the app hasn't been prompted yet, macOS will
+    // show the Local Network permission dialog now.
+    #[cfg(target_os = "macos")]
+    {
+        std::thread::spawn(|| platform::macos::trigger_local_network_prompt());
+    }
+    // Also open System Settings as fallback — if the user previously denied,
+    // the Bonjour call won't re-prompt and they need to toggle it manually.
     let _ = std::process::Command::new("open")
         .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")
         .spawn();
@@ -561,6 +566,11 @@ pub fn run() {
                     st.pet = pet.clone();
                     st.nickname = nickname.clone();
                 }
+
+                // Trigger macOS Local Network permission via Apple's DNS-SD API.
+                // mdns-sd uses raw sockets which bypass Bonjour, so macOS never prompts.
+                #[cfg(target_os = "macos")]
+                platform::macos::trigger_local_network_prompt();
 
                 discovery::start_discovery(discovery_handle, discovery_state, nickname, pet);
             });
