@@ -1,0 +1,5 @@
+# Auto-request reviews when someone touches platform-specific code.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Linux / WSL2 platform adapter — owned by the original author of PR #81
+src-tauri/src/platform/linux.rs @cuongtranba
