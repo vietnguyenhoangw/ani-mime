@@ -45,12 +45,16 @@
   to { background-position: calc(-1 * var(--sprite-width)) 0; }
 }
 
-/* --- Arrival greeting bubble --- */
+/* --- Arrival greeting bubble ---
+   Absolute-positioned above the visitor-dog's top edge so it doesn't
+   contribute to the dog's horizontal footprint. If it were in the
+   flex flow, each visitor-dog would grow to 180–220px (greeting
+   max-width), pushing 3 visitors past the 500px root baseline. */
 .visitor-greeting {
-  position: relative;
-  align-self: center;
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
   max-width: 180px;
-  margin-bottom: 2px;
   padding: 4px 10px;
   border-radius: 10px;
   background: var(--bg-bubble);
@@ -61,6 +65,8 @@
     visitor-greeting-fade 0.35s ease-in 4.65s forwards;
   cursor: pointer;
   pointer-events: auto;
+  transform: translateX(-50%);
+  z-index: 1;
 }
 
 /* Chat message variant: stays visible for the full visit duration
@@ -106,17 +112,17 @@
 @keyframes visitor-greeting-pop {
   0% {
     opacity: 0;
-    transform: scale(0.8) translateY(4px);
+    transform: translateX(-50%) scale(0.8) translateY(4px);
   }
   100% {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateX(-50%) scale(1) translateY(0);
   }
 }
 
 @keyframes visitor-greeting-fade {
   to {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translateX(-50%) translateY(-2px);
   }
 }

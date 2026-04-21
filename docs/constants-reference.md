@@ -78,6 +78,22 @@ All hardcoded values, timeouts, and configurable parameters in the codebase.
 | Log poll interval | 1,000ms | `SuperpowerTool.tsx` | Log viewer refresh rate |
 | Dev mode clicks | 10 | `Settings.tsx` | Clicks on version to enable dev mode |
 
+### Window sizing (see [window-sizing.md](./window-sizing.md) for the full pipeline)
+
+| Constant | Value | File | Purpose |
+|----------|-------|------|---------|
+| `BASELINE_WIDTH` | 320 | `App.tsx` | Root window width floor |
+| `.container` `min-width` | 320 px | `app.css` | CSS-level width floor |
+| `.container` `min-height` | 250 px | `app.css` | CSS-level height floor |
+| `.container.has-visitors` `min-width` | 500 px | `app.css` | Visitor-mode width |
+| Visitor-mode window width | 500 | `App.tsx` (visitor effect) | Explicit `setSize` target while visitors present |
+| `SESSION_DROPDOWN_MIN_WIDTH` | 320 | `App.tsx` | Width floor while session list is open |
+| `SESSION_DROPDOWN_WINDOW_HEIGHT` | 400 | `App.tsx` | Total window height while session list is open |
+| `BASE_PAD_TOP` | 20 | `App.tsx` | Container base top padding (used by bubble math) |
+| `BASE_PAD_HORIZONTAL` | 50 | `App.tsx` | Container base L+R padding (used by bubble math) |
+| `BUBBLE_OVERLAP_PX` | 46 | `App.tsx` | Bubble–sprite overlap in CSS px at scale=1 |
+| `SPRITE_NATIVE_WIDTH` | 128 | `App.tsx` | Pre-scale sprite width |
+
 ### Tauri Store Keys
 
 | Key | Type | Default | Hook |
@@ -93,9 +109,10 @@ All hardcoded values, timeouts, and configurable parameters in the codebase.
 
 | Window | Size | Decorations | Always on Top | Visible |
 |--------|------|-------------|---------------|---------|
-| main | 500x220 | No | Yes | Yes |
-| settings | 620x440 | Yes | No | Hidden |
+| main | 320x250 (baseline, auto-resizes at runtime — see [window-sizing.md](./window-sizing.md)) | No | Yes | Yes |
+| settings | 620x560 | Yes | No | Hidden |
 | superpower | 800x500 | Yes | No | Hidden |
+| peer-list | 280x260 | No | No | Hidden |
 
 ## Environment Variables
 

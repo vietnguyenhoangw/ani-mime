@@ -622,7 +622,11 @@ export function Settings() {
               <div className="settings-row with-hint">
                 <div>
                   <span className="settings-row-label">Local Network Access</span>
-                  <span className="settings-row-hint">Required for peer visits. Grant permission so nearby pets can discover each other.</span>
+                  <span className="settings-row-hint">
+                    Required for peer visits so nearby pets can discover each other. <br/><br/>
+                    Clicking opens <strong>System Settings → Privacy &amp; Security</strong> —
+                    scroll to <strong>Local Network</strong> and enable the toggle for <strong>Ani-Mime</strong>.
+                  </span>
                 </div>
                 <button
                   className="settings-action-btn"

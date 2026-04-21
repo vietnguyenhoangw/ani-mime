@@ -169,9 +169,51 @@ pub fn show_choose_list(title: &str, message: &str, items: &[&str]) -> Vec<Strin
 
 /// Open System Settings → Privacy & Security → Local Network so the user can
 /// grant mDNS permission manually when the first-run probe was denied.
+///
+/// The `x-apple.systempreferences:` URL scheme opens the right pane but
+/// — starting with Sonoma — silently ignores the `?Privacy_LocalNetwork`
+/// anchor, leaving the user at the top of Privacy & Security. AppleScript
+/// `reveal anchor` still works and actually scrolls the view to the
+/// Local Network row, so we use osascript as the primary path and fall
+/// back to the URL scheme only if scripting the app fails (e.g. if
+/// System Settings isn't automation-approved yet).
 pub fn open_local_network_settings() {
+    // Ventura+ — app is called "System Settings", pane lives under
+    // com.apple.settings.PrivacySecurity.extension
+    let modern = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(
+            r#"tell application "System Settings"
+    activate
+    reveal anchor "Privacy_LocalNetwork" of pane id "com.apple.settings.PrivacySecurity.extension"
+end tell"#,
+        )
+        .status();
+
+    if matches!(modern, Ok(s) if s.success()) {
+        return;
+    }
+
+    // Monterey and older — app is "System Preferences", pane is
+    // com.apple.preference.security. The anchor does still scroll on
+    // this older stack.
+    let legacy = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(
+            r#"tell application "System Preferences"
+    activate
+    reveal anchor "Privacy_LocalNetwork" of pane id "com.apple.preference.security"
+end tell"#,
+        )
+        .status();
+
+    if matches!(legacy, Ok(s) if s.success()) {
+        return;
+    }
+
+    // Last-ditch fallback — open the pane even if we can't reach the row.
     let _ = std::process::Command::new("open")
-        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")
+        .arg("x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_LocalNetwork")
         .spawn();
 }
 

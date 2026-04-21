@@ -204,23 +204,28 @@ fn preview_dialog(dialog_id: String, app: tauri::AppHandle) {
 #[tauri::command]
 fn request_local_network() {
     crate::app_log!("[app] request_local_network permission trigger");
-    // Attempt an mDNS browse — this triggers the macOS Local Network permission prompt
-    // if the user hasn't been asked yet. If already denied, open System Preferences.
-    std::thread::spawn(|| {
-        match mdns_sd::ServiceDaemon::new() {
-            Ok(mdns) => {
-                let _ = mdns.browse("_ani-mime._tcp.local.");
-                // Keep daemon alive briefly so the OS has time to show the prompt
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                let _ = mdns.shutdown();
-                crate::app_log!("[app] local network permission probe completed");
-            }
-            Err(e) => {
-                crate::app_warn!("[app] mDNS probe failed ({}), opening system settings", e);
-                platform::open_local_network_settings();
-            }
+    // 1. Fire an mDNS browse on a background thread — if the user has
+    //    not been prompted yet, macOS shows the Local Network prompt.
+    //    If they've already been prompted (granted OR denied), this is
+    //    a no-op and macOS shows nothing.
+    // 2. Open System Settings → Privacy & Security → Local Network
+    //    unconditionally. When the OS shows the prompt, this is a
+    //    slight duplication (both appear). When the prompt path is
+    //    dead (already answered), opening settings gives the user a
+    //    direct path to the toggle instead of a silent click.
+    std::thread::spawn(|| match mdns_sd::ServiceDaemon::new() {
+        Ok(mdns) => {
+            let _ = mdns.browse("_ani-mime._tcp.local.");
+            // Keep daemon alive briefly so the OS has time to show the prompt
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            let _ = mdns.shutdown();
+            crate::app_log!("[app] local network permission probe completed");
+        }
+        Err(e) => {
+            crate::app_warn!("[app] mDNS probe failed ({})", e);
         }
     });
+    platform::open_local_network_settings();
 }
 
 #[tauri::command]

@@ -227,6 +227,7 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange }: Sta
   const [sessionOpen, setSessionOpen] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [dropdownTop, setDropdownTop] = useState(0);
+  const [dropdownMaxHeight, setDropdownMaxHeight] = useState(280);
   const wrapRef = useRef<HTMLDivElement>(null);
   const { enabled: sessionListEnabled } = useSessionList();
   const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
@@ -264,7 +265,18 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange }: Sta
     if (!sessionOpen) return;
     const rect = wrapRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setDropdownTop(rect.bottom + 6);
+    const top = rect.bottom + 6;
+    setDropdownTop(top);
+    // The window grows to 400 tall when the session list opens (see
+    // SESSION_DROPDOWN_WINDOW_HEIGHT in App.tsx). Cap the dropdown's
+    // max-height so it fits between `top` and the window's bottom —
+    // the 10px tail leaves room for the shadow buffer. overflow-y:auto
+    // (in status-pill.css) scrolls when the list is taller.
+    const SESSION_WINDOW_HEIGHT = 400;
+    const BOTTOM_MARGIN = 10;
+    setDropdownMaxHeight(
+      Math.max(120, SESSION_WINDOW_HEIGHT - top - BOTTOM_MARGIN)
+    );
   }, [sessionOpen]);
 
   const toggleSession = async (e: React.MouseEvent) => {
@@ -484,7 +496,10 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange }: Sta
           data-testid="session-dropdown"
           className="session-dropdown"
           role="menu"
-          style={{ top: `${dropdownTop}px` }}
+          style={{
+            top: `${dropdownTop}px`,
+            maxHeight: `${dropdownMaxHeight}px`,
+          }}
         >
           {groups.length === 0 ? (
             <div className="session-empty">No active terminals</div>

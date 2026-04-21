@@ -36,10 +36,33 @@ body {
   user-select: none;
   -webkit-user-select: none;
   position: relative;
-  /* Right/bottom/top padding gives the status pill's neon-glow box-shadow
-     room to render — the window auto-sizes to offsetWidth/Height, which
-     does NOT include box-shadow, so without this the glow is clipped. */
-  padding: 20px 30px 30px 20px;
+  /* 320 × 250 is the baseline "root" size. useWindowAutoSize reads
+     offsetWidth/offsetHeight, so enforcing both min-width and
+     min-height here guarantees the Tauri window is always at least
+     320 × 250 after any transient growth (session dropdown, bubble
+     grow) collapses.
+     While visitors are present the baseline widens to 500 (see
+     .container.has-visitors below) so 1–3 visiting pets fit without
+     the window expanding further each time a greeting appears. */
+  min-width: 320px;
+  min-height: 250px;
+  /* Center main-col (and visitors-col, when present) horizontally
+     inside the 320px baseline so the sprite sits at the window's
+     midpoint instead of flex-starting at the left. */
+  justify-content: center;
+  /* Padding has two jobs:
+     - Base values (20 / 30 / 30 / 20) reserve room for the status pill's
+       neon-glow box-shadow — offsetWidth doesn't include box-shadow, so
+       without this reserve the glow gets clipped by the Tauri window.
+     - --bubble-extra-top and --bubble-extra-h are set from App.tsx when
+       the speech bubble is WIDER than the 320px baseline. Adding them
+       here pushes content + padding past min-width, which (paired with
+       the setSize + setPosition effect in App.tsx) expands the Tauri
+       window around the bubble without jittering the sprite. */
+  padding-top: calc(20px + var(--bubble-extra-top, 0px));
+  padding-right: calc(30px + var(--bubble-extra-h, 0px));
+  padding-bottom: 30px;
+  padding-left: calc(20px + var(--bubble-extra-h, 0px));
 }
 
 .main-col {
@@ -64,6 +87,16 @@ body {
   cursor: grabbing;
 }
 
+/* Visitor mode baseline: up to 3 other pets visit at once, each
+   ~96 * scale wide with a transient greeting up to 180 wide. 500px
+   fits all three sprites + greetings next to the host pet without
+   the window having to resize mid-visit. When the last visitor
+   leaves, this class is removed and the container snaps back to
+   the 320 baseline via min-width. */
+.container.has-visitors {
+  min-width: 500px;
+}
+
 /* Dev tool: outlines the container (== the auto-sized Tauri window)
    so the developer can see the app's exact bounds. outline-offset: -1px
    keeps the stroke inside the window so it can't be clipped. The faint
@@ -82,10 +115,13 @@ body {
 .container.dev-container-bounds::before {
   content: "";
   position: absolute;
-  top: 20px;
-  right: 30px;
+  /* Track the same padding formulas the container uses, so when the
+     bubble-extra vars grow the padding, the content-bounds overlay
+     grows with them and keeps marking the real content box. */
+  top: calc(20px + var(--bubble-extra-top, 0px));
+  right: calc(30px + var(--bubble-extra-h, 0px));
   bottom: 30px;
-  left: 20px;
+  left: calc(20px + var(--bubble-extra-h, 0px));
   outline: 1px dashed #ff3b30;
   outline-offset: -1px;
   background: rgba(255, 59, 48, 0.06);

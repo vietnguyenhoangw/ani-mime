@@ -98,3 +98,4 @@ End-to-end flow from shell command to pixel on screen:
 | [Shell Integration](./shell-integration.md) | Hook scripts for zsh, bash, fish |
 | [Setup Flow](./setup-flow.md) | First-launch auto-setup, shell detection |
 | [Peer Discovery](./peer-discovery.md) | mDNS discovery, visit protocol |
+| [Window Sizing](./window-sizing.md) | Root-window baseline (320×250), growth modes (session / visitors / bubble), how to add a new one |

@@ -1,8 +1,6 @@
 import { useState, useLayoutEffect, useEffect } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { emit, listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { LogicalSize } from "@tauri-apps/api/dpi";
 
 const STORE_FILE = "settings.json";
 const STORE_KEY = "displayScale";
@@ -11,23 +9,16 @@ export type DisplayScale = 0.5 | 1 | 1.5 | 2;
 
 const SCALE_PRESETS: DisplayScale[] = [0.5, 1, 1.5, 2];
 
-const WINDOW_SIZES: Record<number, { width: number; height: number }> = {
-  0.5: { width: 300, height: 140 },
-  1: { width: 500, height: 220 },
-  1.5: { width: 400, height: 280 },
-  2: { width: 450, height: 350 },
-};
-
 function applyScale(scale: number) {
   document.documentElement.style.setProperty("--sprite-scale", String(scale));
 }
 
-async function resizeMainWindow(scale: number) {
-  const win = getCurrentWindow();
-  if (win.label !== "main") return;
-  const size = WINDOW_SIZES[scale] ?? WINDOW_SIZES[1];
-  await win.setSize(new LogicalSize(size.width, size.height));
-}
+// Window size is no longer driven from here — useWindowAutoSize watches
+// .container and resizes the window to match content (which grows with
+// the sprite scale via the CSS --sprite-scale variable). Previously this
+// hook set fixed per-scale sizes (scale=1 → 500x220) which fought the
+// min-width: 320 baseline and caused the window to snap back to 500
+// after any content-driven resize.
 
 export function useScale() {
   const [scale, setScaleState] = useState<DisplayScale>(1);
@@ -38,7 +29,6 @@ export function useScale() {
         const s = SCALE_PRESETS.includes(saved as DisplayScale) ? (saved as DisplayScale) : 1;
         setScaleState(s);
         applyScale(s);
-        resizeMainWindow(s);
       });
     });
   }, []);
@@ -47,7 +37,6 @@ export function useScale() {
     const unlisten = listen<DisplayScale>("scale-changed", (event) => {
       setScaleState(event.payload);
       applyScale(event.payload);
-      resizeMainWindow(event.payload);
     });
 
     return () => {
@@ -58,7 +47,6 @@ export function useScale() {
   const setScale = async (next: DisplayScale) => {
     setScaleState(next);
     applyScale(next);
-    resizeMainWindow(next);
     const store = await load(STORE_FILE);
     await store.set(STORE_KEY, next);
     await store.save();

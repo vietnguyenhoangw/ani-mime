@@ -15,7 +15,15 @@ export function useVisitors() {
 
   useEffect(() => {
     const unlistenArrived = listen<Visitor>("visitor-arrived", (e) => {
-      setVisitors((prev) => [...prev, e.payload]);
+      // Dedupe by instance_name — the listener briefly doubles up under
+      // React Strict Mode's useEffect double-invoke, so a single arrival
+      // event would otherwise add the same visitor twice.
+      setVisitors((prev) => {
+        if (prev.some((v) => v.instance_name === e.payload.instance_name)) {
+          return prev;
+        }
+        return [...prev, e.payload];
+      });
     });
 
     const unlistenLeft = listen<{ instance_name: string; nickname: string }>("visitor-left", (e) => {
