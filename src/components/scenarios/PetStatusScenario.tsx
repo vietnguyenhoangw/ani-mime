@@ -12,6 +12,7 @@ const statuses: { status: Status; label: string; desc: string; color: string; bu
   { status: "visiting", label: "Visiting", desc: "Dog visiting a peer", color: "#af52de" },
   { status: "idle", label: "Free + Bubble", desc: "Idle with short bubble", color: "#30d158", bubble: "Task complete!" },
   { status: "idle", label: "Long Bubble", desc: "Test long text overflow", color: "#30d158", bubble: "Hey! Your build finished successfully after 42 seconds. Everything looks good!" },
+  { status: "idle", label: "Ultra Long Bubble", desc: "Test very long text overflow (2x long)", color: "#30d158", bubble: "Hey! Your build finished successfully after 42 seconds. Everything looks good! I also ran the full test suite, linted every file, and updated the changelog." },
 ];
 
 export function PetStatusScenario() {
