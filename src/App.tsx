@@ -12,6 +12,9 @@ import { useBubble } from "./hooks/useBubble";
 import { useVisitors } from "./hooks/useVisitors";
 import { useScale } from "./hooks/useScale";
 import { useDevMode } from "./hooks/useDevMode";
+import { useDevAppBounds } from "./hooks/useDevAppBounds";
+import { useDevContainerBounds } from "./hooks/useDevContainerBounds";
+import { useDevRootBounds } from "./hooks/useDevRootBounds";
 import { useWindowAutoSize } from "./hooks/useWindowAutoSize";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -38,6 +41,17 @@ function App() {
   const visitors = useVisitors();
   const { scale } = useScale();
   const devMode = useDevMode();
+  const devAppBounds = useDevAppBounds();
+  const devContainerBounds = useDevContainerBounds();
+  const devRootBounds = useDevRootBounds();
+
+  // #root lives in the HTML template outside React's tree, so we toggle
+  // its class imperatively when the dev toggle flips.
+  useEffect(() => {
+    const root = document.getElementById("root");
+    if (!root) return;
+    root.classList.toggle("dev-root-bounds", devRootBounds);
+  }, [devRootBounds]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [effectActive, setEffectActive] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
@@ -130,7 +144,7 @@ function App() {
     <div
       ref={containerRef}
       data-testid="app-container"
-      className={`container ${dragging ? "dragging" : ""} ${scenario ? "scenario-active" : ""}`}
+      className={`container ${dragging ? "dragging" : ""} ${scenario ? "scenario-active" : ""} ${devAppBounds ? "dev-bounds" : ""} ${devContainerBounds ? "dev-container-bounds" : ""}`}
       onMouseDown={onMouseDown}
     >
       <div className="main-col">

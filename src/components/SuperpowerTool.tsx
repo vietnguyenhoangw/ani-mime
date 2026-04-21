@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { useTheme } from "../hooks/useTheme";
 import { ScenarioViewer } from "./scenarios";
 import "../styles/theme.css";
@@ -171,12 +172,43 @@ function LogViewer() {
 export function SuperpowerTool() {
   const [activeMenu, setActiveMenu] = useState<MenuItem>("logs");
   const [devTagVisible, setDevTagVisible] = useState(true);
+  const [appBoundsVisible, setAppBoundsVisible] = useState(true);
+  const [containerBoundsVisible, setContainerBoundsVisible] = useState(true);
+  const [rootBoundsVisible, setRootBoundsVisible] = useState(true);
   useTheme();
+
+  // Push the initial state to the main window so the outlines turn on
+  // the moment the Superpower tool mounts (i.e. when dev mode is opened).
+  // Without this, the main app stays at its defaults (false) until each
+  // toggle is clicked.
+  useEffect(() => {
+    void emit("dev-app-bounds-changed", true);
+    void emit("dev-container-bounds-changed", true);
+    void emit("dev-root-bounds-changed", true);
+  }, []);
 
   const handleDevTagToggle = () => {
     const next = !devTagVisible;
     setDevTagVisible(next);
     invoke("set_dev_mode", { enabled: next });
+  };
+
+  const handleAppBoundsToggle = () => {
+    const next = !appBoundsVisible;
+    setAppBoundsVisible(next);
+    void emit("dev-app-bounds-changed", next);
+  };
+
+  const handleContainerBoundsToggle = () => {
+    const next = !containerBoundsVisible;
+    setContainerBoundsVisible(next);
+    void emit("dev-container-bounds-changed", next);
+  };
+
+  const handleRootBoundsToggle = () => {
+    const next = !rootBoundsVisible;
+    setRootBoundsVisible(next);
+    void emit("dev-root-bounds-changed", next);
   };
 
   return (
@@ -207,6 +239,42 @@ export function SuperpowerTool() {
               onClick={handleDevTagToggle}
               data-testid="dev-tag-toggle"
               aria-label="Toggle DEV tag visibility"
+            >
+              <span className="toggle-knob" />
+            </button>
+          </div>
+          <div className="superpower-toolbar-item">
+            <span className="superpower-toolbar-label">App Bounds</span>
+            <button
+              className={`toggle-switch ${appBoundsVisible ? "active" : ""}`}
+              onClick={handleAppBoundsToggle}
+              data-testid="app-bounds-toggle"
+              aria-label="Toggle app bounds outline"
+              title="Show an outline around the app area to reveal the window size"
+            >
+              <span className="toggle-knob" />
+            </button>
+          </div>
+          <div className="superpower-toolbar-item">
+            <span className="superpower-toolbar-label">Container</span>
+            <button
+              className={`toggle-switch ${containerBoundsVisible ? "active" : ""}`}
+              onClick={handleContainerBoundsToggle}
+              data-testid="container-bounds-toggle"
+              aria-label="Toggle container area outline"
+              title="Show a red outline around the content area (inside the window padding)"
+            >
+              <span className="toggle-knob" />
+            </button>
+          </div>
+          <div className="superpower-toolbar-item">
+            <span className="superpower-toolbar-label">Root</span>
+            <button
+              className={`toggle-switch ${rootBoundsVisible ? "active" : ""}`}
+              onClick={handleRootBoundsToggle}
+              data-testid="root-bounds-toggle"
+              aria-label="Toggle root element outline"
+              title="Show a green outline around the #root element (full webview surface)"
             >
               <span className="toggle-knob" />
             </button>

@@ -64,6 +64,46 @@ body {
   cursor: grabbing;
 }
 
+/* Dev tool: outlines the container (== the auto-sized Tauri window)
+   so the developer can see the app's exact bounds. outline-offset: -1px
+   keeps the stroke inside the window so it can't be clipped. The faint
+   fill makes the transparent padding region visible too. */
+.container.dev-bounds {
+  outline: 1px dashed #5e5ce6;
+  outline-offset: -1px;
+  background: rgba(94, 92, 230, 0.08);
+}
+
+/* Dev tool: red outline around the container's content area (inside the
+   padding that reserves room for the status-pill's neon glow). Drawn as
+   a ::before pseudo-element positioned to match the padding box, so it
+   visualizes the difference between window bounds (.dev-bounds) and the
+   area where actual UI content lives. */
+.container.dev-container-bounds::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  bottom: 30px;
+  left: 20px;
+  outline: 1px dashed #ff3b30;
+  outline-offset: -1px;
+  background: rgba(255, 59, 48, 0.06);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Dev tool: green outline around #root — the React mount node that
+   fills the entire webview (100% × 100%). Distinct from .dev-bounds on
+   .container because the session dropdown temporarily grows the window
+   past the auto-sized container, at which point #root shows the real
+   window surface while .container stays at its content size. */
+#root.dev-root-bounds {
+  outline: 1px dashed #34c759;
+  outline-offset: -1px;
+  background: rgba(52, 199, 89, 0.06);
+}
+
 /* Scenario mode indicator */
 .scenario-badge {
   align-self: center;
