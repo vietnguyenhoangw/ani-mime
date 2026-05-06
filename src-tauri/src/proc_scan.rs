@@ -365,7 +365,11 @@ pub fn get_proc_info(pid: u32) -> Option<ProcInfo> {
     let (ppid, pgid, tpgid, tdev) = proc_pid::pidinfo::<BSDInfo>(pid as i32, 0)
         .map(|info| (info.pbi_ppid, info.pbi_pgid, info.e_tpgid, info.e_tdev))
         .unwrap_or((0, 0, 0, 0));
-    let cwd = get_cwd_macos(pid as i32);
+    let cwd = if is_shell(&name) {
+        get_cwd_macos(pid as i32)
+    } else {
+        None
+    };
     let argv0 = if name == "node" || is_shell(&name) {
         read_argv0(pid as i32).unwrap_or_default()
     } else {
@@ -470,7 +474,16 @@ pub fn scan_processes() -> Vec<ProcInfo> {
             Err(_) => (0, 0, 0, 0),
         };
 
-        let cwd = get_cwd_macos(pid as i32);
+        // Only fetch cwd for shells — it's the only type of process whose
+        // cwd we consume (in reconcile() via is_user_terminal -> is_shell).
+        // PROC_PIDVNODEPATHINFO copies a ~2 KB struct per call, so doing it
+        // unconditionally for every PID on the system was the dominant
+        // cost of this scan loop.
+        let cwd = if is_shell(&name) {
+            get_cwd_macos(pid as i32)
+        } else {
+            None
+        };
 
         // Only spend a sysctl roundtrip on processes that might be Claude
         // Code: node-shipped CLI, shells (we read argv0 for shell detection
