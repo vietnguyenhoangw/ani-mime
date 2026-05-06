@@ -51,7 +51,7 @@ Replace the deprecated `listpids(ProcType::ProcAllPIDS)` call with `processes::p
 A small helper converts the C buffer to a Rust `String`:
 
 ```rust
-fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 17]) -> String {
+fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 16]) -> String {
     let bytes: Vec<u8> = comm.iter()
         .take_while(|&&b| b != 0)
         .map(|&b| b as u8)
@@ -60,7 +60,7 @@ fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 17]) -> String {
 }
 ```
 
-The truncation behavior is identical to `proc_pid::name()` (both expose `p_comm`), so `is_shell()` and `looks_like_version_string()` continue to work unchanged.
+`BSDInfo.pbi_comm` is `[c_char; MAXCOMLEN]` where `MAXCOMLEN = 16` — the kernel does not include a trailing NUL slot in the libproc binding, so `take_while` simply consumes the whole array when the name is exactly 16 bytes. The truncation/empty-on-bad-utf8 behavior matches `proc_pid::name()`, so `is_shell()` and `looks_like_version_string()` continue to work unchanged.
 
 ### 3. Gate `get_cwd_macos()` on `is_shell(name)`
 

@@ -216,14 +216,15 @@ Append to the end of the file:
 
 ```rust
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 mod tests {
     use super::*;
     use std::os::raw::c_char;
 
-    fn make_comm(s: &str) -> [c_char; 17] {
-        let mut buf = [0 as c_char; 17];
+    fn make_comm(s: &str) -> [c_char; 16] {
+        let mut buf = [0 as c_char; 16];
         for (i, b) in s.bytes().enumerate() {
-            if i >= 16 { break; } // leave the trailing NUL
+            if i >= 16 { break; }
             buf[i] = b as c_char;
         }
         buf
@@ -237,23 +238,24 @@ mod tests {
 
     #[test]
     fn pbi_comm_to_string_returns_empty_for_all_zero_buffer() {
-        let comm = [0 as c_char; 17];
+        let comm = [0 as c_char; 16];
         assert_eq!(pbi_comm_to_string(&comm), "");
     }
 
     #[test]
-    fn pbi_comm_to_string_handles_full_16_byte_name_without_nul_in_first_16() {
-        // p_comm is 16 chars + NUL at index 16. A 16-char process name fills
-        // indices 0..15 and the NUL sits at index 16. We must read all 16
-        // bytes, not stop early.
+    fn pbi_comm_to_string_reads_full_buffer_when_no_nul_present() {
+        // pbi_comm is 16 bytes (MAXCOMLEN). When the process name is
+        // exactly 16 bytes, the buffer has NO trailing NUL — the take_while
+        // simply hits the end of the array. Verify the helper returns the
+        // full 16 chars in that case rather than stopping early.
         let comm = make_comm("abcdefghijklmnop"); // exactly 16 chars
         assert_eq!(pbi_comm_to_string(&comm), "abcdefghijklmnop");
     }
 
     #[test]
     fn pbi_comm_to_string_returns_empty_for_invalid_utf8() {
-        let mut comm = [0 as c_char; 17];
-        comm[0] = 0xFFu8 as c_char; // invalid utf-8 start byte
+        let mut comm = [0 as c_char; 16];
+        comm[0] = 0xFFu8 as c_char;
         comm[1] = 0xFEu8 as c_char;
         assert_eq!(pbi_comm_to_string(&comm), "");
     }
@@ -279,11 +281,14 @@ fn argv0_basename(s: &str) -> &str {
 Right above it, add:
 
 ```rust
-/// Convert the C-string `pbi_comm` field of a `BSDInfo` (16 chars + NUL)
-/// to a Rust `String`. Stops at the first NUL byte; returns an empty
-/// string if the bytes are not valid UTF-8 (matches the lossy behavior
-/// of `proc_pid::name()` on garbage input).
-fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 17]) -> String {
+/// Convert the C-string `pbi_comm` field of a `BSDInfo` (16 bytes —
+/// `MAXCOMLEN`, may not have a trailing NUL when the name is exactly
+/// 16 bytes) to a Rust `String`. Stops at the first NUL byte; returns
+/// an empty string if the bytes are not valid UTF-8. Callers should
+/// skip the PID when an empty string is returned, matching the current
+/// behavior where `proc_pid::name()` failure causes `continue`.
+#[cfg(target_os = "macos")]
+fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 16]) -> String {
     let bytes: Vec<u8> = comm.iter()
         .take_while(|&&b| b != 0)
         .map(|&b| b as u8)
@@ -470,5 +475,5 @@ Look for time spent inside `proc_scan` / `scan_processes` / `pidinfo`. If most c
 
 - **Spec coverage:** Every change in the spec maps to a task — Task 1 covers spec §1.3 (gate cwd), Task 2 covers spec §1.1 (UID filter), Tasks 3+4 cover spec §1.2 (drop redundant name call). Spec verification section maps to Task 5. Risks section maps to Task 5 step 7 (the "if it didn't drop" branch).
 - **Placeholder scan:** No TBD/TODO/"add error handling" left. Every code-touching step contains the exact code. Test code is complete and runnable.
-- **Type consistency:** Helper signature is consistent across Task 3 (definition + tests) and Task 4 (call site): `pbi_comm_to_string(&info.pbi_comm)` against `fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 17]) -> String`.
+- **Type consistency:** Helper signature is consistent across Task 3 (definition + tests) and Task 4 (call site): `pbi_comm_to_string(&info.pbi_comm)` against `fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 16]) -> String`. (Original draft of this plan used `; 17` based on a misreading of the kernel `p_comm` size; corrected to `; 16` — `MAXCOMLEN` — once the libproc binding was inspected during T3 review.)
 - **No dead refs:** `pids_by_type` and `ProcFilter` imports are added in Task 2. `pbi_comm_to_string` is added in Task 3 and used in Task 4. `geteuid_safe` is added and used in Task 2.
