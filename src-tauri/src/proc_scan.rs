@@ -458,7 +458,7 @@ fn is_claude(proc: &ProcInfo) -> bool {
 /// down to user-owned PIDs and skip kernel/root daemons that we will
 /// never care about.
 #[cfg(target_os = "macos")]
-fn geteuid_safe() -> u32 {
+fn current_euid() -> u32 {
     extern "C" {
         fn geteuid() -> u32;
     }
@@ -472,7 +472,7 @@ pub fn scan_processes() -> Vec<ProcInfo> {
     // typical Mac) before we pay the per-PID syscall cost. Shells and
     // claude both run as the user, so nothing we care about is excluded.
     // sudo'd processes are intentionally not tracked — same as before.
-    let uid = geteuid_safe();
+    let uid = current_euid();
     let pids = match pids_by_type(ProcFilter::ByUID { uid }) {
         Ok(p) => p,
         Err(e) => {
