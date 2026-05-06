@@ -186,6 +186,18 @@ fn read_argv0(pid: i32) -> Option<String> {
     String::from_utf8(buf[start..pos].to_vec()).ok()
 }
 
+/// Convert the C-string `pbi_comm` field of a `BSDInfo` (16 chars + NUL)
+/// to a Rust `String`. Stops at the first NUL byte; returns an empty
+/// string if the bytes are not valid UTF-8 (matches the lossy behavior
+/// of `proc_pid::name()` on garbage input).
+fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 17]) -> String {
+    let bytes: Vec<u8> = comm.iter()
+        .take_while(|&&b| b != 0)
+        .map(|&b| b as u8)
+        .collect();
+    String::from_utf8(bytes).unwrap_or_default()
+}
+
 /// Just the basename of argv[0] (strip any leading dirs).
 fn argv0_basename(s: &str) -> &str {
     s.rsplit('/').next().unwrap_or(s)
@@ -722,4 +734,48 @@ pub fn start_proc_scanner(app_handle: tauri::AppHandle, app_state: Arc<Mutex<App
         std::thread::sleep(std::time::Duration::from_secs(SCAN_INTERVAL_SECS));
         reconcile(&app_handle, &app_state);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::raw::c_char;
+
+    fn make_comm(s: &str) -> [c_char; 17] {
+        let mut buf = [0 as c_char; 17];
+        for (i, b) in s.bytes().enumerate() {
+            if i >= 16 { break; } // leave the trailing NUL
+            buf[i] = b as c_char;
+        }
+        buf
+    }
+
+    #[test]
+    fn pbi_comm_to_string_reads_until_first_nul() {
+        let comm = make_comm("zsh");
+        assert_eq!(pbi_comm_to_string(&comm), "zsh");
+    }
+
+    #[test]
+    fn pbi_comm_to_string_returns_empty_for_all_zero_buffer() {
+        let comm = [0 as c_char; 17];
+        assert_eq!(pbi_comm_to_string(&comm), "");
+    }
+
+    #[test]
+    fn pbi_comm_to_string_handles_full_16_byte_name_without_nul_in_first_16() {
+        // p_comm is 16 chars + NUL at index 16. A 16-char process name fills
+        // indices 0..15 and the NUL sits at index 16. We must read all 16
+        // bytes, not stop early.
+        let comm = make_comm("abcdefghijklmnop"); // exactly 16 chars
+        assert_eq!(pbi_comm_to_string(&comm), "abcdefghijklmnop");
+    }
+
+    #[test]
+    fn pbi_comm_to_string_returns_empty_for_invalid_utf8() {
+        let mut comm = [0 as c_char; 17];
+        comm[0] = 0xFFu8 as c_char; // invalid utf-8 start byte
+        comm[1] = 0xFEu8 as c_char;
+        assert_eq!(pbi_comm_to_string(&comm), "");
+    }
 }
