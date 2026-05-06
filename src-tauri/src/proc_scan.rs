@@ -24,6 +24,8 @@ use crate::state::AppState;
 use libproc::libproc::bsd_info::BSDInfo;
 #[cfg(target_os = "macos")]
 use libproc::libproc::proc_pid;
+#[cfg(target_os = "macos")]
+use libproc::processes::{pids_by_type, ProcFilter};
 
 // `libproc::proc_pid::pidcwd` is unimplemented on macOS (returns Err). We work
 // around it by calling `proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, ...)` via the
@@ -452,12 +454,29 @@ fn is_claude(proc: &ProcInfo) -> bool {
     is_claude_name(&proc.name) || is_claude_name(argv0_basename(&proc.argv0))
 }
 
+/// Effective UID of the running process. Used to filter `proc_listpids`
+/// down to user-owned PIDs and skip kernel/root daemons that we will
+/// never care about.
+#[cfg(target_os = "macos")]
+fn geteuid_safe() -> u32 {
+    extern "C" {
+        fn geteuid() -> u32;
+    }
+    unsafe { geteuid() }
+}
+
 #[cfg(target_os = "macos")]
 pub fn scan_processes() -> Vec<ProcInfo> {
-    let pids = match proc_pid::listpids(proc_pid::ProcType::ProcAllPIDS) {
+    // Filter to the current user's processes at the OS level. Drops
+    // kernel_task and root-owned daemons (~half the system's PIDs on a
+    // typical Mac) before we pay the per-PID syscall cost. Shells and
+    // claude both run as the user, so nothing we care about is excluded.
+    // sudo'd processes are intentionally not tracked — same as before.
+    let uid = geteuid_safe();
+    let pids = match pids_by_type(ProcFilter::ByUID { uid }) {
         Ok(p) => p,
         Err(e) => {
-            crate::app_warn!("[proc_scan] listpids failed: {}", e);
+            crate::app_warn!("[proc_scan] pids_by_type(ByUID {{uid={}}}) failed: {}", uid, e);
             return Vec::new();
         }
     };
