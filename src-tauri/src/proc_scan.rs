@@ -193,7 +193,6 @@ fn read_argv0(pid: i32) -> Option<String> {
 /// skip the PID when an empty string is returned, matching the current
 /// behavior where `proc_pid::name()` failure causes `continue`.
 #[cfg(target_os = "macos")]
-#[allow(dead_code)]
 fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 16]) -> String {
     let bytes: Vec<u8> = comm.iter()
         .take_while(|&&b| b != 0)
@@ -499,15 +498,20 @@ pub fn scan_processes() -> Vec<ProcInfo> {
 
     let mut out = Vec::new();
     for pid in pids {
-        let name = match proc_pid::name(pid as i32) {
-            Ok(n) => n,
+        // pidinfo<BSDInfo> gives us name (pbi_comm), ppid, pgid, tpgid,
+        // tdev in a single syscall. Skip the PID if it can't be read —
+        // post-UID-filter this is rare (the PID either exited between
+        // listpids and pidinfo, or we somehow lack permission).
+        let info = match proc_pid::pidinfo::<BSDInfo>(pid as i32, 0) {
+            Ok(i) => i,
             Err(_) => continue,
         };
-
-        let (ppid, pgid, tpgid, tdev) = match proc_pid::pidinfo::<BSDInfo>(pid as i32, 0) {
-            Ok(info) => (info.pbi_ppid, info.pbi_pgid, info.e_tpgid, info.e_tdev),
-            Err(_) => (0, 0, 0, 0),
-        };
+        let name = pbi_comm_to_string(&info.pbi_comm);
+        if name.is_empty() {
+            continue;
+        }
+        let (ppid, pgid, tpgid, tdev) =
+            (info.pbi_ppid, info.pbi_pgid, info.e_tpgid, info.e_tdev);
 
         // Only fetch cwd for shells — it's the only type of process whose
         // cwd we consume (in reconcile() via is_user_terminal -> is_shell).
