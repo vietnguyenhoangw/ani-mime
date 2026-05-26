@@ -160,6 +160,33 @@ fn validate_window(w: &WindowConfig) -> Result<(), ManifestError> {
     Ok(())
 }
 
+use std::path::{Path, PathBuf};
+
+/// Resolve `entry` (a relative path inside `plugin_dir`) to a canonical
+/// `PathBuf`, refusing any result that escapes `plugin_dir`.
+///
+/// Returns `EntryNotFound` if the file does not exist, `EntryEscape`
+/// if the canonical path leaves `plugin_dir`.
+pub fn canonicalize_entry(plugin_dir: &Path, entry: &str) -> Result<PathBuf, ManifestError> {
+    if entry.trim().is_empty() {
+        return Err(ManifestError::InvalidEntry("entry is empty".into()));
+    }
+    if Path::new(entry).is_absolute() {
+        return Err(ManifestError::EntryEscape(entry.into()));
+    }
+    let plugin_dir_canonical = plugin_dir
+        .canonicalize()
+        .map_err(|e| ManifestError::EntryNotFound(format!("plugin dir: {}", e)))?;
+    let joined = plugin_dir_canonical.join(entry);
+    let canonical = joined
+        .canonicalize()
+        .map_err(|_| ManifestError::EntryNotFound(entry.into()))?;
+    if !canonical.starts_with(&plugin_dir_canonical) {
+        return Err(ManifestError::EntryEscape(entry.into()));
+    }
+    Ok(canonical)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,5 +351,55 @@ mod tests {
         let mut m = minimal_manifest();
         m.window.width = MAX_WINDOW_WIDTH + 1;
         assert!(matches!(m.validate(), Err(ManifestError::InvalidWindow(_))));
+    }
+
+    use tempfile::TempDir;
+
+    fn touch(dir: &std::path::Path, rel: &str) -> std::path::PathBuf {
+        let p = dir.join(rel);
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(&p, b"").unwrap();
+        p
+    }
+
+    #[test]
+    fn canonicalize_entry_accepts_file_in_dir() {
+        let tmp = TempDir::new().unwrap();
+        touch(tmp.path(), "index.html");
+        let resolved = canonicalize_entry(tmp.path(), "index.html").expect("ok");
+        assert!(resolved.ends_with("index.html"));
+        assert!(resolved.starts_with(tmp.path().canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn canonicalize_entry_accepts_nested_file() {
+        let tmp = TempDir::new().unwrap();
+        touch(tmp.path(), "assets/sub/page.html");
+        let resolved = canonicalize_entry(tmp.path(), "assets/sub/page.html").expect("ok");
+        assert!(resolved.ends_with("assets/sub/page.html"));
+    }
+
+    #[test]
+    fn canonicalize_entry_rejects_parent_traversal() {
+        let tmp = TempDir::new().unwrap();
+        touch(tmp.path(), "index.html");
+        let err = canonicalize_entry(tmp.path(), "../outside").unwrap_err();
+        assert!(matches!(err, ManifestError::EntryEscape(_) | ManifestError::EntryNotFound(_)));
+    }
+
+    #[test]
+    fn canonicalize_entry_rejects_absolute_path() {
+        let tmp = TempDir::new().unwrap();
+        let err = canonicalize_entry(tmp.path(), "/etc/passwd").unwrap_err();
+        assert!(matches!(err, ManifestError::EntryEscape(_) | ManifestError::EntryNotFound(_)));
+    }
+
+    #[test]
+    fn canonicalize_entry_rejects_missing_file() {
+        let tmp = TempDir::new().unwrap();
+        let err = canonicalize_entry(tmp.path(), "does-not-exist.html").unwrap_err();
+        assert!(matches!(err, ManifestError::EntryNotFound(_)));
     }
 }
