@@ -10,6 +10,7 @@ mod focus;
 mod helpers;
 mod logger;
 mod platform;
+mod plugin;
 mod proc_scan;
 mod server;
 mod setup;
