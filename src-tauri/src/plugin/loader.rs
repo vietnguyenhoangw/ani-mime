@@ -1,8 +1,9 @@
 //! Filesystem ops: dirs, zip extraction, install/uninstall, startup scan.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::Serialize;
-use crate::plugin::manifest::Manifest;
+use crate::plugin::manifest::{Manifest, WindowConfig};
 
 /// State of a plugin in `AppState.plugins`. Returned to the frontend
 /// over the `get_plugins` Tauri command.
@@ -236,6 +237,91 @@ pub fn uninstall_plugin(id: &str, plugins_root: &Path) -> Result<(), UninstallEr
     Ok(())
 }
 
+/// Scan `plugins_root` for installed plugins. Returns a map keyed by
+/// the directory name (which equals the manifest `id` for valid plugins,
+/// or whatever the dir is called for broken plugins). Plugins whose
+/// manifest parses but fails validation are returned with
+/// `PluginStatus::Error(reason)` so the UI can show them.
+///
+/// Hidden directories (names starting with '.') are skipped — this
+/// excludes `.staging-*` dirs from in-progress installs.
+pub fn scan_plugins(plugins_root: &Path) -> HashMap<String, PluginRecord> {
+    let mut out = HashMap::new();
+    let entries = match std::fs::read_dir(plugins_root) {
+        Ok(e) => e,
+        Err(_) => return out,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let dir_name = match entry.file_name().into_string() {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        if dir_name.starts_with('.') {
+            continue;
+        }
+
+        match load_plugin_dir(&path) {
+            Ok(manifest) => {
+                out.insert(
+                    manifest.id.clone(),
+                    PluginRecord {
+                        manifest,
+                        enabled: true,
+                        status: PluginStatus::Loaded,
+                        webview_label: None,
+                    },
+                );
+            }
+            Err(reason) => {
+                let placeholder = Manifest {
+                    id: dir_name.clone(),
+                    name: dir_name.clone(),
+                    version: "0.0.0".to_string(),
+                    description: String::new(),
+                    author: String::new(),
+                    entry: String::new(),
+                    icon: None,
+                    hotkey: None,
+                    capabilities: Vec::new(),
+                    window: WindowConfig {
+                        width: 1,
+                        height: 1,
+                        resizable: false,
+                        always_on_top: false,
+                        transparent: false,
+                        decorations: true,
+                    },
+                };
+                out.insert(
+                    dir_name,
+                    PluginRecord {
+                        manifest: placeholder,
+                        enabled: false,
+                        status: PluginStatus::Error(reason),
+                        webview_label: None,
+                    },
+                );
+            }
+        }
+    }
+    out
+}
+
+fn load_plugin_dir(plugin_dir: &Path) -> Result<Manifest, String> {
+    let manifest_path = plugin_dir.join("manifest.json");
+    let json = std::fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("manifest.json: {}", e))?;
+    let manifest: Manifest = serde_json::from_str(&json)
+        .map_err(|e| format!("manifest.json parse: {}", e))?;
+    manifest.validate().map_err(|e| e.to_string())?;
+    canonicalize_entry(plugin_dir, &manifest.entry).map_err(|e| e.to_string())?;
+    Ok(manifest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -457,5 +543,48 @@ mod tests {
         let err = uninstall_plugin("../etc", root.path()).unwrap_err();
         assert!(!matches!(err, UninstallError::Io(_)));
         assert!(!root.path().parent().unwrap().join("etc").exists());
+    }
+
+    #[test]
+    fn scan_plugins_returns_empty_for_missing_root() {
+        let root = TempDir::new().unwrap();
+        let missing = root.path().join("does-not-exist");
+        let records = scan_plugins(&missing);
+        assert!(records.is_empty());
+    }
+
+    #[test]
+    fn scan_plugins_finds_installed() {
+        let root = TempDir::new().unwrap();
+        let zip = build_plugin_zip("translator", &[]);
+        install_plugin_from_zip(zip.path(), root.path()).expect("install");
+
+        let records = scan_plugins(root.path());
+        assert_eq!(records.len(), 1);
+        let rec = records.get("translator").unwrap();
+        assert_eq!(rec.manifest.id, "translator");
+        assert!(rec.enabled, "scanned plugins default to enabled");
+        assert!(matches!(rec.status, PluginStatus::Loaded));
+        assert!(rec.webview_label.is_none());
+    }
+
+    #[test]
+    fn scan_plugins_marks_broken_manifest_as_error() {
+        let root = TempDir::new().unwrap();
+        let plugin_dir = root.path().join("broken");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(plugin_dir.join("manifest.json"), b"not json").unwrap();
+
+        let records = scan_plugins(root.path());
+        let rec = records.get("broken").expect("present");
+        assert!(matches!(rec.status, PluginStatus::Error(_)));
+    }
+
+    #[test]
+    fn scan_plugins_ignores_staging_dirs() {
+        let root = TempDir::new().unwrap();
+        std::fs::create_dir_all(root.path().join(".staging-123")).unwrap();
+        let records = scan_plugins(root.path());
+        assert!(records.is_empty());
     }
 }
