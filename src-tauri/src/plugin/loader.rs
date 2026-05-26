@@ -107,6 +107,91 @@ pub fn extract_zip_safe(zip_path: &Path, dest_dir: &Path) -> Result<(), ExtractE
     Ok(())
 }
 
+use crate::plugin::manifest::{canonicalize_entry, ManifestError};
+
+#[derive(Debug)]
+pub enum InstallError {
+    Io(std::io::Error),
+    Extract(ExtractError),
+    ManifestMissing,
+    Manifest(ManifestError),
+    AlreadyInstalled(String),
+}
+
+impl std::fmt::Display for InstallError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "io error: {}", e),
+            Self::Extract(e) => write!(f, "extract failed: {}", e),
+            Self::ManifestMissing => write!(f, "manifest.json missing from zip"),
+            Self::Manifest(e) => write!(f, "{}", e),
+            Self::AlreadyInstalled(id) => write!(f, "plugin '{}' already installed", id),
+        }
+    }
+}
+
+impl std::error::Error for InstallError {}
+
+impl From<std::io::Error> for InstallError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+impl From<ExtractError> for InstallError {
+    fn from(e: ExtractError) -> Self {
+        Self::Extract(e)
+    }
+}
+impl From<ManifestError> for InstallError {
+    fn from(e: ManifestError) -> Self {
+        Self::Manifest(e)
+    }
+}
+
+/// Install a plugin from `zip_path` into `plugins_root` (typically
+/// the value returned by `plugins_root()`, but tests pass a tempdir).
+///
+/// Steps: stage in sibling dir → validate → atomic rename to final dest.
+pub fn install_plugin_from_zip(
+    zip_path: &Path,
+    plugins_root: &Path,
+) -> Result<Manifest, InstallError> {
+    std::fs::create_dir_all(plugins_root)?;
+
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let staging = plugins_root.join(format!(".staging-{}", nanos));
+    std::fs::create_dir(&staging)?;
+
+    let result = (|| -> Result<Manifest, InstallError> {
+        extract_zip_safe(zip_path, &staging)?;
+
+        let manifest_path = staging.join("manifest.json");
+        if !manifest_path.is_file() {
+            return Err(InstallError::ManifestMissing);
+        }
+        let manifest_json = std::fs::read_to_string(&manifest_path)?;
+        let manifest: Manifest = serde_json::from_str(&manifest_json)
+            .map_err(|e| InstallError::Manifest(ManifestError::InvalidJson(e.to_string())))?;
+        manifest.validate()?;
+        canonicalize_entry(&staging, &manifest.entry)?;
+
+        let dest = plugins_root.join(&manifest.id);
+        if dest.exists() {
+            return Err(InstallError::AlreadyInstalled(manifest.id.clone()));
+        }
+        std::fs::rename(&staging, &dest)?;
+        Ok(manifest)
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_dir_all(&staging);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,5 +278,114 @@ mod tests {
         let dest = TempDir::new().unwrap();
         extract_zip_safe(zip.path(), dest.path()).expect("ok");
         assert!(dest.path().join("a/b/c/d.txt").is_file());
+    }
+
+    fn minimal_manifest_json(id: &str) -> String {
+        format!(
+            r#"{{
+                "id": "{id}",
+                "name": "Test",
+                "version": "0.1.0",
+                "entry": "index.html",
+                "capabilities": ["window"],
+                "window": {{ "width": 100, "height": 100 }}
+            }}"#
+        )
+    }
+
+    fn build_plugin_zip(id: &str, extra: &[(&str, &[u8])]) -> tempfile::NamedTempFile {
+        let manifest = minimal_manifest_json(id);
+        let f = tempfile::NamedTempFile::new().unwrap();
+        let mut w = ZipWriter::new(f.reopen().unwrap());
+        let opts = SimpleFileOptions::default();
+        w.start_file("manifest.json", opts).unwrap();
+        w.write_all(manifest.as_bytes()).unwrap();
+        w.start_file("index.html", opts).unwrap();
+        w.write_all(b"<html></html>").unwrap();
+        for (name, content) in extra {
+            w.start_file(*name, opts).unwrap();
+            w.write_all(content).unwrap();
+        }
+        w.finish().unwrap();
+        f
+    }
+
+    #[test]
+    fn install_plugin_extracts_and_validates() {
+        let zip = build_plugin_zip("translator", &[]);
+        let root = TempDir::new().unwrap();
+        let manifest = install_plugin_from_zip(zip.path(), root.path()).expect("ok");
+        assert_eq!(manifest.id, "translator");
+        assert!(root.path().join("translator/manifest.json").is_file());
+        assert!(root.path().join("translator/index.html").is_file());
+        let staging_remnants: Vec<_> = std::fs::read_dir(root.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".staging-"))
+            .collect();
+        assert!(staging_remnants.is_empty(), "staging not cleaned up");
+    }
+
+    #[test]
+    fn install_plugin_rejects_id_collision() {
+        let root = TempDir::new().unwrap();
+        let zip1 = build_plugin_zip("translator", &[]);
+        install_plugin_from_zip(zip1.path(), root.path()).expect("first install ok");
+
+        let zip2 = build_plugin_zip("translator", &[]);
+        let err = install_plugin_from_zip(zip2.path(), root.path()).unwrap_err();
+        assert!(matches!(err, InstallError::AlreadyInstalled(_)));
+    }
+
+    #[test]
+    fn install_plugin_rejects_missing_manifest() {
+        let f = tempfile::NamedTempFile::new().unwrap();
+        let mut w = ZipWriter::new(f.reopen().unwrap());
+        let opts = SimpleFileOptions::default();
+        w.start_file("index.html", opts).unwrap();
+        w.write_all(b"<html></html>").unwrap();
+        w.finish().unwrap();
+
+        let root = TempDir::new().unwrap();
+        let err = install_plugin_from_zip(f.path(), root.path()).unwrap_err();
+        assert!(matches!(err, InstallError::ManifestMissing));
+    }
+
+    #[test]
+    fn install_plugin_rejects_invalid_manifest() {
+        let f = tempfile::NamedTempFile::new().unwrap();
+        let mut w = ZipWriter::new(f.reopen().unwrap());
+        let opts = SimpleFileOptions::default();
+        w.start_file("manifest.json", opts).unwrap();
+        w.write_all(br#"{"id": "BadID", "name":"X", "version":"0.1.0", "entry":"i.html", "capabilities":[], "window":{"width":1,"height":1}}"#).unwrap();
+        w.start_file("i.html", opts).unwrap();
+        w.write_all(b"x").unwrap();
+        w.finish().unwrap();
+
+        let root = TempDir::new().unwrap();
+        let err = install_plugin_from_zip(f.path(), root.path()).unwrap_err();
+        assert!(matches!(err, InstallError::Manifest(_)));
+    }
+
+    #[test]
+    fn install_plugin_rejects_missing_entry_file() {
+        let manifest_json = r#"{
+            "id": "x",
+            "name": "X",
+            "version": "0.1.0",
+            "entry": "missing.html",
+            "capabilities": [],
+            "window": { "width": 100, "height": 100 }
+        }"#;
+        let f = tempfile::NamedTempFile::new().unwrap();
+        let mut w = ZipWriter::new(f.reopen().unwrap());
+        let opts = SimpleFileOptions::default();
+        w.start_file("manifest.json", opts).unwrap();
+        w.write_all(manifest_json.as_bytes()).unwrap();
+        w.finish().unwrap();
+
+        let root = TempDir::new().unwrap();
+        let err = install_plugin_from_zip(f.path(), root.path()).unwrap_err();
+        assert!(matches!(err, InstallError::Manifest(_)));
     }
 }
