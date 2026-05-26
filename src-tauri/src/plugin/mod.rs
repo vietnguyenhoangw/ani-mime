@@ -7,3 +7,5 @@
 pub mod loader;
 pub mod manifest;
 pub mod protocol;
+
+pub use loader::PluginRecord;

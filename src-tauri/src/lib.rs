@@ -608,6 +608,7 @@ pub fn run() {
                 last_task_duration_secs: 0,
                 usage_day: crate::helpers::now_secs() / 86400,
                 last_sessions_fingerprint: 0,
+                plugins: HashMap::new(),
             }));
 
             app.manage(app_state.clone());

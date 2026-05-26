@@ -1,6 +1,29 @@
 //! Filesystem ops: dirs, zip extraction, install/uninstall, startup scan.
 
 use std::path::PathBuf;
+use serde::Serialize;
+use crate::plugin::manifest::Manifest;
+
+/// State of a plugin in `AppState.plugins`. Returned to the frontend
+/// over the `get_plugins` Tauri command.
+#[derive(Clone, Debug, Serialize)]
+pub struct PluginRecord {
+    pub manifest: Manifest,
+    pub enabled: bool,
+    pub status: PluginStatus,
+    /// Set when a WebView is currently spawned for this plugin (Slice 2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webview_label: Option<String>,
+}
+
+/// Either `Loaded` (manifest valid, files present) or `Error(reason)`
+/// (manifest revalidation failed at scan time).
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "type", content = "reason")]
+pub enum PluginStatus {
+    Loaded,
+    Error(String),
+}
 
 /// Returns `~/.ani-mime/plugins/`.
 pub fn plugins_root() -> std::io::Result<PathBuf> {
