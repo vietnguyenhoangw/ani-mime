@@ -499,6 +499,9 @@ fn get_plugins(app: tauri::AppHandle) -> Vec<plugin::PluginRecord> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .register_uri_scheme_protocol("plugin", |ctx, request| {
+            crate::plugin::protocol::handle_plugin_protocol(ctx.app_handle(), request)
+        })
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Debug)
@@ -697,6 +700,21 @@ pub fn run() {
 
             app.manage(app_state.clone());
             crate::app_log!("[app] state initialized");
+
+            match plugin::loader::plugins_root() {
+                Ok(root) => {
+                    let records = plugin::loader::scan_plugins(&root);
+                    let count = records.len();
+                    if let Ok(mut guard) = app_state.lock() {
+                        guard.plugins = records;
+                    }
+                    crate::app_log!("[plugin] startup scan: {} installed", count);
+                    let _ = app.emit("plugins-changed", ());
+                }
+                Err(e) => {
+                    crate::app_warn!("[plugin] could not determine plugins root: {}", e);
+                }
+            }
 
             server::start_http_server(app.handle().clone(), app_state.clone());
             watchdog::start_watchdog(app.handle().clone(), app_state.clone());
