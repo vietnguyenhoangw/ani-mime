@@ -3,6 +3,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use serde::Serialize;
 use tauri::Emitter;
+use crate::plugin::PluginRecord;
 
 /// Payload emitted when a task finishes (busy -> idle).
 #[derive(Clone, Serialize)]
@@ -134,6 +135,9 @@ pub struct AppState {
     /// `sessions-changed` only when this value shifts, so the frontend can
     /// stay event-driven instead of polling.
     pub last_sessions_fingerprint: u64,
+    /// Installed plugins, keyed by manifest `id`. Populated at startup by
+    /// `plugin::loader::scan_plugins` and mutated by install/uninstall.
+    pub plugins: HashMap<String, PluginRecord>,
 }
 
 /// Deterministic hash of the session fields the UI renders. Pids are sorted so

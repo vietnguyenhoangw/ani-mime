@@ -36,6 +36,11 @@ hostname = "0.4"
 ureq = { version = "3", features = ["json"] }
 url = "2"
 urlencoding = "2"
+zip = "2"
+semver = "1"
+
+[dev-dependencies]
+tempfile = "3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.26"
