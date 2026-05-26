@@ -50,6 +50,116 @@ fn default_true() -> bool {
     true
 }
 
+/// Validation errors surfaced to the user at install time.
+#[derive(Debug, Clone)]
+pub enum ManifestError {
+    InvalidJson(String),
+    InvalidId(String),
+    InvalidVersion(String),
+    UnknownCapability(String),
+    InvalidWindow(String),
+    InvalidEntry(String),
+    EntryEscape(String),
+    EntryNotFound(String),
+}
+
+impl std::fmt::Display for ManifestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidJson(m) => write!(f, "invalid manifest JSON: {}", m),
+            Self::InvalidId(m) => write!(f, "invalid id: {}", m),
+            Self::InvalidVersion(m) => write!(f, "invalid version: {}", m),
+            Self::UnknownCapability(c) => write!(f, "unknown capability: {}", c),
+            Self::InvalidWindow(m) => write!(f, "invalid window config: {}", m),
+            Self::InvalidEntry(m) => write!(f, "invalid entry: {}", m),
+            Self::EntryEscape(m) => write!(f, "entry escapes plugin dir: {}", m),
+            Self::EntryNotFound(m) => write!(f, "entry not found: {}", m),
+        }
+    }
+}
+
+impl std::error::Error for ManifestError {}
+
+impl Manifest {
+    /// Validate every field that can be checked without filesystem access.
+    /// Entry-path canonicalization is a separate step (`canonicalize_entry`)
+    /// because it needs the unpacked plugin dir.
+    pub fn validate(&self) -> Result<(), ManifestError> {
+        validate_id(&self.id)?;
+        validate_version(&self.version)?;
+        validate_capabilities(&self.capabilities)?;
+        validate_window(&self.window)?;
+        if self.entry.trim().is_empty() {
+            return Err(ManifestError::InvalidEntry("entry is empty".into()));
+        }
+        Ok(())
+    }
+}
+
+fn validate_id(id: &str) -> Result<(), ManifestError> {
+    if id.is_empty() {
+        return Err(ManifestError::InvalidId("id is empty".into()));
+    }
+    if id.len() > MAX_ID_LEN {
+        return Err(ManifestError::InvalidId(format!(
+            "id longer than {} chars",
+            MAX_ID_LEN
+        )));
+    }
+    let mut chars = id.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_lowercase() {
+        return Err(ManifestError::InvalidId(format!(
+            "id must start with lowercase ASCII letter, got '{}'",
+            first
+        )));
+    }
+    for c in chars {
+        if !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+            return Err(ManifestError::InvalidId(format!(
+                "id may only contain [a-z0-9-], got '{}'",
+                c
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_version(v: &str) -> Result<(), ManifestError> {
+    semver::Version::parse(v).map_err(|e| ManifestError::InvalidVersion(e.to_string()))?;
+    Ok(())
+}
+
+fn validate_capabilities(caps: &[String]) -> Result<(), ManifestError> {
+    for c in caps {
+        if !ALLOWED_CAPABILITIES.contains(&c.as_str()) {
+            return Err(ManifestError::UnknownCapability(c.clone()));
+        }
+    }
+    Ok(())
+}
+
+fn validate_window(w: &WindowConfig) -> Result<(), ManifestError> {
+    if w.width == 0 || w.height == 0 {
+        return Err(ManifestError::InvalidWindow(
+            "width and height must be positive".into(),
+        ));
+    }
+    if w.width > MAX_WINDOW_WIDTH {
+        return Err(ManifestError::InvalidWindow(format!(
+            "width > {}",
+            MAX_WINDOW_WIDTH
+        )));
+    }
+    if w.height > MAX_WINDOW_HEIGHT {
+        return Err(ManifestError::InvalidWindow(format!(
+            "height > {}",
+            MAX_WINDOW_HEIGHT
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,5 +240,89 @@ mod tests {
                        "capabilities": [], "window": { "width": 1, "height": 1 } }"#;
         let result: Result<Manifest, _> = serde_json::from_str(json);
         assert!(result.is_err(), "missing id should fail");
+    }
+
+    fn minimal_manifest() -> Manifest {
+        Manifest {
+            id: "ok-id".to_string(),
+            name: "Ok".to_string(),
+            version: "0.1.0".to_string(),
+            description: String::new(),
+            author: String::new(),
+            entry: "i.html".to_string(),
+            icon: None,
+            hotkey: None,
+            capabilities: vec!["window".to_string()],
+            window: WindowConfig {
+                width: 480,
+                height: 320,
+                resizable: false,
+                always_on_top: true,
+                transparent: false,
+                decorations: true,
+            },
+        }
+    }
+
+    #[test]
+    fn validate_accepts_well_formed() {
+        let m = minimal_manifest();
+        assert!(m.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_uppercase_id() {
+        let mut m = minimal_manifest();
+        m.id = "BadId".to_string();
+        assert!(matches!(m.validate(), Err(ManifestError::InvalidId(_))));
+    }
+
+    #[test]
+    fn validate_rejects_id_starting_with_digit() {
+        let mut m = minimal_manifest();
+        m.id = "1plugin".to_string();
+        assert!(matches!(m.validate(), Err(ManifestError::InvalidId(_))));
+    }
+
+    #[test]
+    fn validate_rejects_empty_id() {
+        let mut m = minimal_manifest();
+        m.id = "".to_string();
+        assert!(matches!(m.validate(), Err(ManifestError::InvalidId(_))));
+    }
+
+    #[test]
+    fn validate_rejects_overlong_id() {
+        let mut m = minimal_manifest();
+        m.id = "a".repeat(MAX_ID_LEN + 1);
+        assert!(matches!(m.validate(), Err(ManifestError::InvalidId(_))));
+    }
+
+    #[test]
+    fn validate_rejects_bad_semver() {
+        let mut m = minimal_manifest();
+        m.version = "not-a-version".to_string();
+        assert!(matches!(m.validate(), Err(ManifestError::InvalidVersion(_))));
+    }
+
+    #[test]
+    fn validate_rejects_unknown_capability() {
+        let mut m = minimal_manifest();
+        m.capabilities = vec!["window".to_string(), "espionage".to_string()];
+        assert!(matches!(m.validate(), Err(ManifestError::UnknownCapability(_))));
+    }
+
+    #[test]
+    fn validate_rejects_zero_window_width() {
+        let mut m = minimal_manifest();
+        m.window.width = 0;
+        assert!(matches!(m.validate(), Err(ManifestError::InvalidWindow(_))));
+    }
+
+    #[test]
+    fn validate_rejects_oversized_window() {
+        let mut m = minimal_manifest();
+        m.window.width = MAX_WINDOW_WIDTH + 1;
+        assert!(matches!(m.validate(), Err(ManifestError::InvalidWindow(_))));
     }
 }
