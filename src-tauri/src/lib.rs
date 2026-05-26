@@ -480,6 +480,11 @@ fn set_ani_plugin_enabled(
             None => return Err(format!("plugin '{}' not installed", id)),
         }
     }
+    crate::app_log!(
+        "[plugin] {} {}",
+        if enabled { "enabled" } else { "disabled" },
+        id
+    );
     let _ = app.emit("plugins-changed", ());
     Ok(())
 }

@@ -233,7 +233,7 @@ pub fn uninstall_plugin(id: &str, plugins_root: &Path) -> Result<(), UninstallEr
     if !dir_canonical.starts_with(&root_canonical) {
         return Err(UninstallError::InvalidId(id.into()));
     }
-    std::fs::remove_dir_all(&dir)?;
+    std::fs::remove_dir_all(&dir_canonical)?;
     Ok(())
 }
 

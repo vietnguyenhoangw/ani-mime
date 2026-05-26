@@ -136,7 +136,14 @@ pub fn handle_plugin_protocol(
                 .unwrap(),
             Err(_) => status(StatusCode::NOT_FOUND, b"read failed"),
         },
-        Err(ResolveError::Escape) => status(StatusCode::FORBIDDEN, b"path escape"),
+        Err(ResolveError::Escape) => {
+            crate::app_warn!(
+                "[plugin] path escape attempt: id={} path={}",
+                plugin_id,
+                request_path
+            );
+            status(StatusCode::FORBIDDEN, b"path escape")
+        }
         Err(ResolveError::NotFound) => status(StatusCode::NOT_FOUND, b"not found"),
         Err(ResolveError::InvalidPath) => status(StatusCode::BAD_REQUEST, b"invalid path"),
     }
