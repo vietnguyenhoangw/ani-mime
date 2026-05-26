@@ -192,6 +192,50 @@ pub fn install_plugin_from_zip(
     result
 }
 
+#[derive(Debug)]
+pub enum UninstallError {
+    Io(std::io::Error),
+    NotInstalled(String),
+    InvalidId(String),
+}
+
+impl std::fmt::Display for UninstallError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "io error: {}", e),
+            Self::NotInstalled(id) => write!(f, "plugin '{}' not installed", id),
+            Self::InvalidId(id) => write!(f, "invalid plugin id: {}", id),
+        }
+    }
+}
+
+impl std::error::Error for UninstallError {}
+
+impl From<std::io::Error> for UninstallError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+/// Remove the plugin's directory entirely. Caller is responsible for
+/// updating AppState (Task 12).
+pub fn uninstall_plugin(id: &str, plugins_root: &Path) -> Result<(), UninstallError> {
+    if id.is_empty() || id.contains('/') || id.contains('\\') || id == ".." || id == "." {
+        return Err(UninstallError::InvalidId(id.into()));
+    }
+    let dir = plugins_root.join(id);
+    if !dir.is_dir() {
+        return Err(UninstallError::NotInstalled(id.into()));
+    }
+    let dir_canonical = dir.canonicalize()?;
+    let root_canonical = plugins_root.canonicalize()?;
+    if !dir_canonical.starts_with(&root_canonical) {
+        return Err(UninstallError::InvalidId(id.into()));
+    }
+    std::fs::remove_dir_all(&dir)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,5 +431,31 @@ mod tests {
         let root = TempDir::new().unwrap();
         let err = install_plugin_from_zip(f.path(), root.path()).unwrap_err();
         assert!(matches!(err, InstallError::Manifest(_)));
+    }
+
+    #[test]
+    fn uninstall_plugin_removes_dir() {
+        let root = TempDir::new().unwrap();
+        let zip = build_plugin_zip("translator", &[]);
+        install_plugin_from_zip(zip.path(), root.path()).expect("install");
+        assert!(root.path().join("translator").is_dir());
+
+        uninstall_plugin("translator", root.path()).expect("uninstall");
+        assert!(!root.path().join("translator").exists());
+    }
+
+    #[test]
+    fn uninstall_plugin_errors_when_missing() {
+        let root = TempDir::new().unwrap();
+        let err = uninstall_plugin("nope", root.path()).unwrap_err();
+        assert!(matches!(err, UninstallError::NotInstalled(_)));
+    }
+
+    #[test]
+    fn uninstall_plugin_rejects_path_escape_id() {
+        let root = TempDir::new().unwrap();
+        let err = uninstall_plugin("../etc", root.path()).unwrap_err();
+        assert!(!matches!(err, UninstallError::Io(_)));
+        assert!(!root.path().parent().unwrap().join("etc").exists());
     }
 }
