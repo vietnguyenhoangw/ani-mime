@@ -18,18 +18,23 @@ export function PluginManager() {
 
   return (
     <div className="plugin-manager" data-testid="plugin-manager">
-      <div className="plugin-manager-header">
-        <p className="plugin-manager-desc">
-          Install mini-app plugins from a <code>.zip</code>. Plugins run in their own window.
-        </p>
-        <button
-          type="button"
-          className="plugin-install-btn"
-          data-testid="install-plugin-btn"
-          onClick={() => install()}
-        >
-          Install plugin…
-        </button>
+      <div className="settings-card">
+        <div className="settings-row with-hint">
+          <div>
+            <span className="settings-row-label">Installed Plugins</span>
+            <span className="settings-row-hint">
+              Install mini-app plugins from a <code>.zip</code>. Each plugin runs in its own window.
+            </span>
+          </div>
+          <button
+            type="button"
+            className="settings-action-btn"
+            data-testid="install-plugin-btn"
+            onClick={() => install()}
+          >
+            Install…
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -39,13 +44,13 @@ export function PluginManager() {
       )}
 
       {loading ? (
-        <p className="plugin-loading" data-testid="plugin-loading">Loading…</p>
+        <p className="settings-section-desc" data-testid="plugin-loading">Loading…</p>
       ) : plugins.length === 0 ? (
-        <p className="plugin-empty" data-testid="plugin-empty-state">
+        <p className="settings-section-desc" data-testid="plugin-empty-state">
           No plugins installed yet.
         </p>
       ) : (
-        <ul className="plugin-list">
+        <div className="plugin-list">
           {plugins.map((p) => (
             <PluginCard
               key={p.manifest.id}
@@ -56,7 +61,7 @@ export function PluginManager() {
               onUninstall={() => handleUninstall(p.manifest.id)}
             />
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
@@ -80,13 +85,15 @@ function PluginCard({
   const errorReason = status.type === "Error" ? status.reason : null;
 
   return (
-    <li className="plugin-card" data-testid={`plugin-card-${manifest.id}`}>
-      <div className="plugin-card-main">
-        <div className="plugin-card-title">
-          <span className="plugin-name">{manifest.name}</span>
+    <div className="settings-card plugin-card" data-testid={`plugin-card-${manifest.id}`}>
+      <div className="plugin-card-info">
+        <span className="settings-row-label plugin-card-title">
+          {manifest.name}
           <span className="plugin-version">v{manifest.version}</span>
-        </div>
-        {manifest.description && <p className="plugin-card-desc">{manifest.description}</p>}
+        </span>
+        {manifest.description && (
+          <span className="settings-row-hint">{manifest.description}</span>
+        )}
         <div className="plugin-caps">
           {manifest.capabilities.map((c) => (
             <span key={c} className="plugin-cap-chip" data-testid={`plugin-cap-${manifest.id}-${c}`}>
@@ -95,9 +102,9 @@ function PluginCard({
           ))}
         </div>
         {errorReason && (
-          <p className="plugin-error" data-testid={`plugin-error-${manifest.id}`}>
+          <span className="plugin-error" data-testid={`plugin-error-${manifest.id}`}>
             {errorReason}
-          </p>
+          </span>
         )}
       </div>
 
@@ -107,16 +114,16 @@ function PluginCard({
           role="switch"
           aria-checked={enabled}
           aria-label={`${enabled ? "Disable" : "Enable"} ${manifest.name}`}
-          className={`plugin-toggle ${enabled ? "on" : "off"}`}
+          className={`toggle-switch ${enabled ? "active" : ""}`}
           data-testid={`plugin-enable-toggle-${manifest.id}`}
           disabled={isError}
           onClick={onToggle}
         >
-          {enabled ? "On" : "Off"}
+          <span className="toggle-knob" />
         </button>
         <button
           type="button"
-          className="plugin-launch-btn"
+          className="settings-action-btn"
           data-testid={`plugin-launch-btn-${manifest.id}`}
           disabled={!enabled || isError}
           onClick={onLaunch}
@@ -125,13 +132,13 @@ function PluginCard({
         </button>
         <button
           type="button"
-          className={`plugin-uninstall-btn ${confirming ? "confirming" : ""}`}
+          className={`settings-action-btn ${confirming ? "plugin-uninstall-confirming" : ""}`}
           data-testid={`plugin-uninstall-btn-${manifest.id}`}
           onClick={onUninstall}
         >
           {confirming ? "Confirm?" : "Uninstall"}
         </button>
       </div>
-    </li>
+    </div>
   );
 }
