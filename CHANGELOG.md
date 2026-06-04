@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.12] - 2026-06-04
+
+### Added
+- **Plugin system.** Install, enable/disable, launch, and uninstall mini-app plugins from a `.zip` via a new **Plugins** tab in Settings. Plugins run sandboxed in their own WebView (`plugin://` scheme) with a `window.ani` SDK gated by declared capabilities (`window`, `storage`, `clipboard`).
+- **Clipboard Manager plugin + native clipboard capability.** A background monitor keeps your last 20 copies (deduped, newest-first) while a clipboard-capable plugin is enabled; the plugin shows the history and pastes any entry back with one click.
+- **Global launch hotkeys.** A plugin's manifest hotkey opens it from anywhere; reassign it by clicking the hotkey badge in the Plugins tab.
+- **Cmd/Ctrl+W quick-close** for dialog windows (Settings, Superpower, Peer List, Session List) and plugin windows.
+
 ## [0.17.8] - 2026-05-05
 
 ### Changed
