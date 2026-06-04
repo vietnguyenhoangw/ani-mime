@@ -77,6 +77,7 @@ function PluginCard({
 }) {
   const { manifest, enabled, status } = record;
   const isError = status.type === "Error";
+  const errorReason = status.type === "Error" ? status.reason : null;
 
   return (
     <li className="plugin-card" data-testid={`plugin-card-${manifest.id}`}>
@@ -93,9 +94,9 @@ function PluginCard({
             </span>
           ))}
         </div>
-        {isError && (
+        {errorReason && (
           <p className="plugin-error" data-testid={`plugin-error-${manifest.id}`}>
-            {status.type === "Error" ? status.reason : ""}
+            {errorReason}
           </p>
         )}
       </div>

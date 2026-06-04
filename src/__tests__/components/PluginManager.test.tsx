@@ -74,6 +74,22 @@ describe("PluginManager", () => {
     await waitFor(() => expect(invoke).toHaveBeenCalledWith("uninstall_plugin", { id: "translator" }));
   });
 
+  it("arming uninstall on one plugin resets when another is armed", async () => {
+    mockInvoke("get_plugins", [rec("alpha"), rec("beta")]);
+    mockInvoke("uninstall_plugin", null);
+    render(<PluginManager />);
+
+    const alphaBtn = await screen.findByTestId("plugin-uninstall-btn-alpha");
+    fireEvent.click(alphaBtn); // arm alpha
+    expect(screen.getByTestId("plugin-uninstall-btn-alpha")).toHaveTextContent("Confirm?");
+
+    fireEvent.click(screen.getByTestId("plugin-uninstall-btn-beta")); // arm beta
+    // alpha reverts, beta armed, nothing uninstalled yet
+    expect(screen.getByTestId("plugin-uninstall-btn-alpha")).toHaveTextContent("Uninstall");
+    expect(screen.getByTestId("plugin-uninstall-btn-beta")).toHaveTextContent("Confirm?");
+    expect(invoke).not.toHaveBeenCalledWith("uninstall_plugin", { id: "alpha" });
+  });
+
   it("install button invokes install_plugin_from_dialog", async () => {
     mockInvoke("get_plugins", []);
     mockInvoke("install_plugin_from_dialog", () => { throw new Error("install canceled"); });

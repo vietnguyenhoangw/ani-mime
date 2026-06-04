@@ -12,6 +12,7 @@ export function usePlugins() {
     try {
       const list = await invoke<PluginRecord[]>("get_plugins");
       setPlugins(list);
+      setError(null);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -36,32 +37,32 @@ export function usePlugins() {
     setError(null);
     try {
       await invoke("install_plugin_from_dialog");
+      await refresh();
     } catch (e) {
       const msg = String(e);
       // A user cancel is not a failure.
       if (!/cancel/i.test(msg)) setError(msg);
     }
-    await refresh();
   }, [refresh]);
 
   const uninstall = useCallback(async (id: string) => {
     setError(null);
     try {
       await invoke("uninstall_plugin", { id });
+      await refresh();
     } catch (e) {
       setError(String(e));
     }
-    await refresh();
   }, [refresh]);
 
   const setEnabled = useCallback(async (id: string, enabled: boolean) => {
     setError(null);
     try {
       await invoke("set_ani_plugin_enabled", { id, enabled });
+      await refresh();
     } catch (e) {
       setError(String(e));
     }
-    await refresh();
   }, [refresh]);
 
   const launch = useCallback(async (id: string) => {
