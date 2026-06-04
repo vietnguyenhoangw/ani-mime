@@ -14,11 +14,14 @@
   gap: 8px;
 }
 
-/* Each plugin is a header / body / footer card. */
+/* Each plugin is a header / body / footer card. .settings-card has no
+   padding of its own (the rest of the app pads via .settings-row), so the
+   plugin card supplies its own content padding. */
 .plugin-card {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 12px;
 }
 
 .plugin-card.is-disabled .plugin-name,
@@ -82,12 +85,15 @@
   font-size: 13px;
 }
 
-/* Footer: actions right-aligned, separated from the body by a hairline. */
+/* Footer: actions right-aligned, with a full-bleed hairline divider.
+   Negative margins stretch the divider to the card edges and cancel the
+   card's bottom padding; the footer then re-pads its own buttons. */
 .plugin-card-foot {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding-top: 8px;
+  margin: 4px -12px -12px;
+  padding: 10px 12px;
   border-top: 1px solid rgba(128, 128, 128, 0.15);
 }
 
