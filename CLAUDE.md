@@ -83,6 +83,9 @@ Peer announces ←UDP :1235 (mDNS + multicast + unicast scan)→ AppState.peers 
 | `constants/sprites.ts` | Sprite file map, frame counts, auto-stop set |
 | `types/status.ts` | `Status` type, `SpriteConfig` interface |
 | `assets/claude-logo.png` | Claude Code icon shown on sessions running `claude` |
+| `components/PluginManager.tsx` | Settings "Plugins" tab — install (.zip) / list / enable / disable / launch / uninstall installed plugins |
+| `hooks/usePlugins.ts` | Loads plugins via `get_plugins`, refreshes on `plugins-changed`, exposes install/uninstall/setEnabled/launch actions |
+| `types/plugin.ts` | `PluginRecord` / `PluginManifest` / `PluginStatus` TypeScript mirrors of the Rust types |
 
 ### Status Priority
 
