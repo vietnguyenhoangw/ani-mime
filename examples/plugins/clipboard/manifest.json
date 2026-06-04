@@ -1,0 +1,17 @@
+{
+  "id": "clipboard",
+  "name": "Clipboard Manager",
+  "version": "0.1.0",
+  "description": "Save snippets of copied text and paste them back with one click.",
+  "author": "ani-mime",
+  "entry": "index.html",
+  "hotkey": "CmdOrCtrl+Shift+V",
+  "capabilities": ["window", "storage"],
+  "window": {
+    "width": 440,
+    "height": 480,
+    "resizable": true,
+    "alwaysOnTop": true,
+    "decorations": true
+  }
+}
