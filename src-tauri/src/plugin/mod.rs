@@ -7,6 +7,8 @@
 pub mod loader;
 pub mod manifest;
 pub mod protocol;
+pub mod runtime;
 pub mod storage;
 
 pub use loader::PluginRecord;
+pub use manifest::Manifest;
