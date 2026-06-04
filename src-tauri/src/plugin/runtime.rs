@@ -56,9 +56,13 @@ pub const ANI_SDK_JS: &str = r#"
     }
   };
 
-  // Default: Escape closes the plugin window unless the plugin handled it.
+  // Default: Escape, or Cmd/Ctrl+W, closes the plugin window unless the
+  // plugin handled it.
   window.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !e.defaultPrevented) {
+    if (e.defaultPrevented) return;
+    var quickClose = (e.metaKey || e.ctrlKey) && (e.key === 'w' || e.key === 'W');
+    if (e.key === 'Escape' || quickClose) {
+      if (quickClose) e.preventDefault();
       window.ani.window.close();
     }
   });

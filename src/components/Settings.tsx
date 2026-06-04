@@ -29,6 +29,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { useClaudeConfig } from "../hooks/useClaudeConfig";
+import { useQuickClose } from "../hooks/useQuickClose";
 import { useSoundSettings } from "../hooks/useSoundSettings";
 import { useSoundOverrides } from "../hooks/useSoundOverrides";
 import { useCustomSounds, type CustomSound, MAX_SIZE_BYTES } from "../hooks/useCustomSounds";
@@ -84,6 +85,7 @@ const tabTitles: Record<Tab, string> = {
 };
 
 export function Settings() {
+  useQuickClose();
   const { theme, setTheme } = useTheme();
   const { pet, setPet } = usePet();
   const { enabled: bubbleEnabled, setEnabled: setBubbleEnabled } = useBubble();

@@ -7,6 +7,7 @@ import { fetchSessions, type SessionInfo } from "./hooks/useSessions";
 import { useCollapsedSessionGroups } from "./hooks/useCollapsedSessionGroups";
 import { useTheme } from "./hooks/useTheme";
 import { useWindowAutoSize } from "./hooks/useWindowAutoSize";
+import { useQuickClose } from "./hooks/useQuickClose";
 import "./styles/theme.css";
 import "./styles/session-list-window.css";
 
@@ -149,6 +150,7 @@ function overlayClaudeState(sessions: SessionInfo[]): SessionInfo[] {
 }
 
 export function SessionListApp() {
+  useQuickClose();
   const rootRef = useRef<HTMLDivElement>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
