@@ -6,6 +6,7 @@ import { useNickname } from "./hooks/useNickname";
 import { usePet } from "./hooks/usePet";
 import { useTheme } from "./hooks/useTheme";
 import { useWindowAutoSize } from "./hooks/useWindowAutoSize";
+import { useQuickClose } from "./hooks/useQuickClose";
 import "./styles/theme.css";
 import "./styles/peer-list-window.css";
 
@@ -13,6 +14,7 @@ import "./styles/peer-list-window.css";
 const MESSAGE_MAX_LEN = 100;
 
 export function PeerListApp() {
+  useQuickClose();
   const peers = usePeers();
   const { nickname } = useNickname();
   const { pet } = usePet();

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { useTheme } from "../hooks/useTheme";
+import { useQuickClose } from "../hooks/useQuickClose";
 import { ScenarioViewer } from "./scenarios";
 import "../styles/theme.css";
 import "../styles/superpower.css";
@@ -170,6 +171,7 @@ function LogViewer() {
 }
 
 export function SuperpowerTool() {
+  useQuickClose();
   const [activeMenu, setActiveMenu] = useState<MenuItem>("logs");
   const [devTagVisible, setDevTagVisible] = useState(true);
   const [appBoundsVisible, setAppBoundsVisible] = useState(true);

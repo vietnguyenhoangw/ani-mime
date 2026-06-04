@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clipboard Manager</title>
+  <style>
+    :root {
+      --bg: #1e1e22;
+      --surface: rgba(255, 255, 255, 0.06);
+      --surface-hover: rgba(255, 255, 255, 0.10);
+      --border: rgba(255, 255, 255, 0.10);
+      --text: #f2f2f4;
+      --muted: rgba(242, 242, 244, 0.55);
+      --accent: #007aff;
+      --danger: #ff3b30;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5f7;
+        --surface: rgba(0, 0, 0, 0.04);
+        --surface-hover: rgba(0, 0, 0, 0.08);
+        --border: rgba(0, 0, 0, 0.10);
+        --text: #1d1d1f;
+        --muted: rgba(29, 29, 31, 0.55);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      gap: 10px;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    h1 { font-size: 14px; margin: 0; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 11px; margin: 0; }
+    button {
+      font: inherit;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: background 0.12s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: var(--surface-hover); }
+    button.danger { color: var(--danger); }
+    .list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .item:hover { background: var(--surface-hover); }
+    .item-text {
+      flex: 1;
+      min-width: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 2.9em;
+      overflow: hidden;
+      -webkit-user-select: text;
+      user-select: text;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+    }
+    .item-index { color: var(--muted); font-size: 11px; flex-shrink: 0; width: 18px; text-align: right; }
+    .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .item-actions button { padding: 3px 8px; font-size: 12px; }
+    .empty { color: var(--muted); text-align: center; padding: 28px 8px; line-height: 1.6; }
+    .toast {
+      position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+      background: var(--text); color: var(--bg);
+      padding: 6px 12px; border-radius: 999px; font-size: 12px;
+      opacity: 0; transition: opacity 0.2s; pointer-events: none;
+    }
+    .toast.show { opacity: 0.95; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Clipboard History</h1>
+      <p class="sub">Your last 20 copies — click an item to copy it back.</p>
+    </div>
+    <button id="clear" class="danger">Clear</button>
+  </header>
+
+  <ul class="list" id="list"></ul>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const listEl = $("list");
+    const toastEl = $("toast");
+
+    let confirmingClear = false;
+    let lastJSON = "";
+
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => toastEl.classList.remove("show"), 1300);
+    }
+
+    async function getHistory() {
+      try {
+        const h = await window.ani.clipboard.history();
+        return Array.isArray(h) ? h : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    async function copyItem(text) {
+      try {
+        await window.ani.clipboard.copy(text);
+        toast("Copied — now paste anywhere");
+        refresh();
+      } catch (e) {
+        toast("Copy failed");
+      }
+    }
+
+    async function removeItem(text) {
+      try {
+        await window.ani.clipboard.remove(text);
+        refresh();
+      } catch (e) {
+        toast("Remove failed");
+      }
+    }
+
+    function render(history) {
+      // Skip re-render if nothing changed (keeps the poll cheap + avoids flicker).
+      const json = JSON.stringify(history);
+      if (json === lastJSON) return;
+      lastJSON = json;
+
+      listEl.innerHTML = "";
+
+      if (history.length === 0) {
+        const li = document.createElement("li");
+        li.className = "empty";
+        li.textContent = "Nothing copied yet. Copy text in any app and it shows up here.";
+        listEl.appendChild(li);
+        return;
+      }
+
+      history.forEach((text, i) => {
+        const li = document.createElement("li");
+        li.className = "item";
+        li.title = "Click to copy back";
+        li.addEventListener("click", (e) => {
+          if (e.target.closest(".item-actions")) return;
+          copyItem(text);
+        });
+
+        const idx = document.createElement("span");
+        idx.className = "item-index";
+        idx.textContent = i + 1;
+
+        const txt = document.createElement("div");
+        txt.className = "item-text";
+        txt.textContent = text;
+
+        const actions = document.createElement("div");
+        actions.className = "item-actions";
+
+        const copyBtn = document.createElement("button");
+        copyBtn.textContent = "Copy";
+        copyBtn.addEventListener("click", () => copyItem(text));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "danger";
+        delBtn.textContent = "✕";
+        delBtn.title = "Remove";
+        delBtn.addEventListener("click", () => removeItem(text));
+
+        actions.appendChild(copyBtn);
+        actions.appendChild(delBtn);
+        li.appendChild(idx);
+        li.appendChild(txt);
+        li.appendChild(actions);
+        listEl.appendChild(li);
+      });
+    }
+
+    async function refresh() {
+      render(await getHistory());
+    }
+
+    $("clear").addEventListener("click", async () => {
+      if (!confirmingClear) {
+        confirmingClear = true;
+        $("clear").textContent = "Confirm?";
+        setTimeout(() => {
+          confirmingClear = false;
+          $("clear").textContent = "Clear";
+        }, 2500);
+        return;
+      }
+      confirmingClear = false;
+      $("clear").textContent = "Clear";
+      try {
+        await window.ani.clipboard.clear();
+        lastJSON = "";
+        refresh();
+        toast("Cleared");
+      } catch (e) {
+        toast("Clear failed");
+      }
+    });
+
+    // Live view: poll the host history while the window is open.
+    refresh();
+    setInterval(refresh, 1000);
+    window.addEventListener("focus", refresh);
+  </script>
+</body>
+</html>

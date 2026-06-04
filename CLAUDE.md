@@ -57,6 +57,10 @@ Peer announces ←UDP :1235 (mDNS + multicast + unicast scan)→ AppState.peers 
 | `platform/mod.rs` | Cross-platform facade: `setup_main_window`, `set_dock_visibility`, `open_path`, `open_url`, `show_dialog`, `show_choose_list`, `open_local_network_settings`, `run_update_command` |
 | `platform/macos.rs` | macOS impl: Cocoa/objc window tweaks, `osascript` dialogs, `open` / `brew --cask` update flow |
 | `platform/linux.rs` | Linux impl: Tauri-native transparency, `zenity` dialogs, `xdg-open`, manual update via release URL |
+| `plugin/runtime.rs` | Spawns a per-plugin WebView (`plugin://<id>/<entry>`), injects the `window.ani` SDK, maps plugin id ↔ `plugin-<id>` window label |
+| `plugin/gateway.rs` | `plugin_call` command — the single gated entry point for `window.ani`; checks declared capabilities, dispatches to storage / window ops |
+| `plugin/storage.rs` | Per-plugin key/value store at `~/.ani-mime/plugins/<id>/data/store.json` |
+| `plugin/clipboard.rs` | Background OS-clipboard monitor (arboard) + history (deduped, capped 20, persisted to `~/.ani-mime/clipboard-history.json`); runs only while a `clipboard`-capable plugin is enabled; exposed via the `clipboard` capability |
 
 ### MCP Server (`src-tauri/mcp-server/`)
 
@@ -80,6 +84,9 @@ Peer announces ←UDP :1235 (mDNS + multicast + unicast scan)→ AppState.peers 
 | `constants/sprites.ts` | Sprite file map, frame counts, auto-stop set |
 | `types/status.ts` | `Status` type, `SpriteConfig` interface |
 | `assets/claude-logo.png` | Claude Code icon shown on sessions running `claude` |
+| `components/PluginManager.tsx` | Settings "Plugins" tab — install (.zip) / list / enable / disable / launch / uninstall installed plugins |
+| `hooks/usePlugins.ts` | Loads plugins via `get_plugins`, refreshes on `plugins-changed`, exposes install/uninstall/setEnabled/launch actions |
+| `types/plugin.ts` | `PluginRecord` / `PluginManifest` / `PluginStatus` TypeScript mirrors of the Rust types |
 
 ### Status Priority
 
@@ -114,6 +121,7 @@ When multiple terminals are open, the UI shows one winner: `busy > service > idl
 - MCP server (`server.mjs`) is installed to `~/.ani-mime/mcp/` on every startup; registered in `~/.claude.json` during first-launch setup
 - MCP endpoints: `/mcp/say` (speech bubble), `/mcp/react` (temp animation), `/mcp/pet-status` (JSON status)
 - MCP reactions map to existing statuses: celebrate/excited→service, nervous→busy, confused→searching, sleep→disconnected
+- Plugin WebViews are created at runtime (`plugin::runtime::launch_plugin_webview`), labeled `plugin-<id>`, and granted the `plugin` capability (`src-tauri/capabilities/plugin.json`, scoped to the `plugin-*` glob). All `window.ani` calls route through the single `plugin_call` command, which derives the plugin id from the calling window label — never from JS args — so plugins cannot impersonate each other. Window control (show/hide/resize/close) and per-plugin storage are mediated by `plugin_call`; the `launch_plugin` command is the temporary trigger until the hotkey (Slice 3) and Plugin Manager UI (Slice 4) land.
 
 ## Logging
 

@@ -8,6 +8,8 @@ const mockWindow = {
   setPosition: vi.fn(async () => {}),
   outerPosition: vi.fn(async () => ({ x: 0, y: 0 })),
   setSize: vi.fn(async () => {}),
+  hide: vi.fn(async () => {}),
+  close: vi.fn(async () => {}),
 };
 
 export function getCurrentWindow() {
@@ -19,4 +21,6 @@ export function resetMocks() {
   mockWindow.setPosition.mockClear();
   mockWindow.outerPosition.mockClear();
   mockWindow.setSize.mockClear();
+  mockWindow.hide.mockClear();
+  mockWindow.close.mockClear();
 }

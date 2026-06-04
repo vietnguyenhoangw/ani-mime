@@ -24,6 +24,8 @@ use crate::state::AppState;
 use libproc::libproc::bsd_info::BSDInfo;
 #[cfg(target_os = "macos")]
 use libproc::libproc::proc_pid;
+#[cfg(target_os = "macos")]
+use libproc::processes::{pids_by_type, ProcFilter};
 
 // `libproc::proc_pid::pidcwd` is unimplemented on macOS (returns Err). We work
 // around it by calling `proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, ...)` via the
@@ -182,6 +184,21 @@ fn read_argv0(pid: i32) -> Option<String> {
         return None;
     }
     String::from_utf8(buf[start..pos].to_vec()).ok()
+}
+
+/// Convert the C-string `pbi_comm` field of a `BSDInfo` (16 bytes —
+/// `MAXCOMLEN`, may not have a trailing NUL when the name is exactly
+/// 16 bytes) to a Rust `String`. Stops at the first NUL byte; returns
+/// an empty string if the bytes are not valid UTF-8. Callers should
+/// skip the PID when an empty string is returned, matching the current
+/// behavior where `proc_pid::name()` failure causes `continue`.
+#[cfg(target_os = "macos")]
+fn pbi_comm_to_string(comm: &[std::os::raw::c_char; 16]) -> String {
+    let bytes: Vec<u8> = comm.iter()
+        .take_while(|&&b| b != 0)
+        .map(|&b| b as u8)
+        .collect();
+    String::from_utf8(bytes).unwrap_or_default()
 }
 
 /// Just the basename of argv[0] (strip any leading dirs).
@@ -365,7 +382,11 @@ pub fn get_proc_info(pid: u32) -> Option<ProcInfo> {
     let (ppid, pgid, tpgid, tdev) = proc_pid::pidinfo::<BSDInfo>(pid as i32, 0)
         .map(|info| (info.pbi_ppid, info.pbi_pgid, info.e_tpgid, info.e_tdev))
         .unwrap_or((0, 0, 0, 0));
-    let cwd = get_cwd_macos(pid as i32);
+    let cwd = if is_shell(&name) {
+        get_cwd_macos(pid as i32)
+    } else {
+        None
+    };
     let argv0 = if name == "node" || is_shell(&name) {
         read_argv0(pid as i32).unwrap_or_default()
     } else {
@@ -448,29 +469,60 @@ fn is_claude(proc: &ProcInfo) -> bool {
     is_claude_name(&proc.name) || is_claude_name(argv0_basename(&proc.argv0))
 }
 
+/// Effective UID of the running process. Used to filter `proc_listpids`
+/// down to user-owned PIDs and skip kernel/root daemons that we will
+/// never care about.
+#[cfg(target_os = "macos")]
+fn current_euid() -> u32 {
+    extern "C" {
+        fn geteuid() -> u32;
+    }
+    unsafe { geteuid() }
+}
+
 #[cfg(target_os = "macos")]
 pub fn scan_processes() -> Vec<ProcInfo> {
-    let pids = match proc_pid::listpids(proc_pid::ProcType::ProcAllPIDS) {
+    // Filter to the current user's processes at the OS level. Drops
+    // kernel_task and root-owned daemons (~half the system's PIDs on a
+    // typical Mac) before we pay the per-PID syscall cost. Shells and
+    // claude both run as the user, so nothing we care about is excluded.
+    // sudo'd processes are intentionally not tracked — same as before.
+    let uid = current_euid();
+    let pids = match pids_by_type(ProcFilter::ByUID { uid }) {
         Ok(p) => p,
         Err(e) => {
-            crate::app_warn!("[proc_scan] listpids failed: {}", e);
+            crate::app_warn!("[proc_scan] pids_by_type(ByUID {{uid={}}}) failed: {}", uid, e);
             return Vec::new();
         }
     };
 
     let mut out = Vec::new();
     for pid in pids {
-        let name = match proc_pid::name(pid as i32) {
-            Ok(n) => n,
+        // pidinfo<BSDInfo> gives us name (pbi_comm), ppid, pgid, tpgid,
+        // tdev in a single syscall. Skip the PID if it can't be read —
+        // post-UID-filter this is rare (the PID either exited between
+        // listpids and pidinfo, or we somehow lack permission).
+        let info = match proc_pid::pidinfo::<BSDInfo>(pid as i32, 0) {
+            Ok(i) => i,
             Err(_) => continue,
         };
+        let name = pbi_comm_to_string(&info.pbi_comm);
+        if name.is_empty() {
+            continue;
+        }
+        let (ppid, pgid, tpgid, tdev) =
+            (info.pbi_ppid, info.pbi_pgid, info.e_tpgid, info.e_tdev);
 
-        let (ppid, pgid, tpgid, tdev) = match proc_pid::pidinfo::<BSDInfo>(pid as i32, 0) {
-            Ok(info) => (info.pbi_ppid, info.pbi_pgid, info.e_tpgid, info.e_tdev),
-            Err(_) => (0, 0, 0, 0),
+        // Only fetch cwd for shells — it's the only type of process whose
+        // cwd we consume (in reconcile() via is_user_terminal -> is_shell).
+        // PROC_PIDVNODEPATHINFO copies a ~2 KB struct per call, so doing it
+        // unconditionally for every PID on the system was the dominant
+        // cost of this scan loop.
+        let cwd = if is_shell(&name) {
+            get_cwd_macos(pid as i32)
+        } else {
+            None
         };
-
-        let cwd = get_cwd_macos(pid as i32);
 
         // Only spend a sysctl roundtrip on processes that might be Claude
         // Code: node-shipped CLI, shells (we read argv0 for shell detection
@@ -690,4 +742,50 @@ pub fn start_proc_scanner(app_handle: tauri::AppHandle, app_state: Arc<Mutex<App
         std::thread::sleep(std::time::Duration::from_secs(SCAN_INTERVAL_SECS));
         reconcile(&app_handle, &app_state);
     });
+}
+
+#[cfg(test)]
+#[cfg(target_os = "macos")]
+mod tests {
+    use super::*;
+    use std::os::raw::c_char;
+
+    fn make_comm(s: &str) -> [c_char; 16] {
+        let mut buf = [0 as c_char; 16];
+        for (i, b) in s.bytes().enumerate() {
+            if i >= 16 { break; }
+            buf[i] = b as c_char;
+        }
+        buf
+    }
+
+    #[test]
+    fn pbi_comm_to_string_reads_until_first_nul() {
+        let comm = make_comm("zsh");
+        assert_eq!(pbi_comm_to_string(&comm), "zsh");
+    }
+
+    #[test]
+    fn pbi_comm_to_string_returns_empty_for_all_zero_buffer() {
+        let comm = [0 as c_char; 16];
+        assert_eq!(pbi_comm_to_string(&comm), "");
+    }
+
+    #[test]
+    fn pbi_comm_to_string_reads_full_buffer_when_no_nul_present() {
+        // pbi_comm is 16 bytes (MAXCOMLEN). When the process name is
+        // exactly 16 bytes, the buffer has NO trailing NUL — the take_while
+        // simply hits the end of the array. Verify the helper returns the
+        // full 16 chars in that case rather than stopping early.
+        let comm = make_comm("abcdefghijklmnop"); // exactly 16 chars
+        assert_eq!(pbi_comm_to_string(&comm), "abcdefghijklmnop");
+    }
+
+    #[test]
+    fn pbi_comm_to_string_returns_empty_for_invalid_utf8() {
+        let mut comm = [0 as c_char; 16];
+        comm[0] = 0xFFu8 as c_char;
+        comm[1] = 0xFEu8 as c_char;
+        assert_eq!(pbi_comm_to_string(&comm), "");
+    }
 }

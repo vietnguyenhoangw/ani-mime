@@ -1,0 +1,150 @@
+/* Plugin Manager — reuses the shared Settings design system
+   (.settings-card, .settings-row, .toggle-switch, .settings-action-btn).
+   Only plugin-specific layout/accents live here. */
+
+.plugin-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Each plugin is a header / body / footer card. .settings-card has no
+   padding of its own (the rest of the app pads via .settings-row), so the
+   plugin card supplies its own content padding. */
+.plugin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.plugin-card.is-disabled .plugin-name,
+.plugin-card.is-disabled .plugin-desc,
+.plugin-card.is-disabled .plugin-caps {
+  opacity: 0.5;
+}
+
+/* Header: name + version on the left, enable toggle on the right. */
+.plugin-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plugin-name {
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.plugin-version {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.5;
+}
+
+.plugin-desc {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.plugin-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.plugin-cap-chip {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.18);
+}
+
+.plugin-error {
+  margin: 0;
+  font-size: 12px;
+  color: #ff3b30;
+}
+
+.plugin-error-banner {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+  font-size: 13px;
+}
+
+/* Footer: hotkey badge on the left, actions on the right, with a full-bleed
+   hairline divider. Negative margins stretch the divider to the card edges
+   and cancel the card's bottom padding; the footer re-pads its own content. */
+.plugin-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px -12px -12px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+.plugin-foot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Clickable keyboard-shortcut badge (e.g. ⌘⇧V) at the footer's left.
+   Clicking enters recording mode to reassign the shortcut. */
+.plugin-hotkey {
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgba(128, 128, 128, 0.16);
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  color: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.plugin-hotkey:hover { background: rgba(128, 128, 128, 0.24); }
+.plugin-hotkey.recording {
+  background: rgba(0, 122, 255, 0.14);
+  border-color: #007aff;
+  color: #007aff;
+}
+
+/* "+ Shortcut" affordance for plugins with no hotkey yet. */
+.plugin-hotkey-add {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px dashed rgba(128, 128, 128, 0.4);
+  color: var(--muted, rgba(128, 128, 128, 0.8));
+  cursor: pointer;
+}
+.plugin-hotkey-add:hover { border-color: #007aff; color: #007aff; }
+
+.plugin-card.is-disabled .plugin-hotkey {
+  opacity: 0.5;
+}
+
+/* Uninstall reuses .settings-action-btn; turns red while awaiting confirm. */
+.plugin-uninstall-confirming {
+  color: #ff3b30;
+  background: rgba(255, 59, 48, 0.12);
+}

@@ -19,6 +19,7 @@ import { useOpacity, OPACITY_MIN, OPACITY_MAX } from "../hooks/useOpacity";
 import { effects, useEffectEnabled } from "../effects";
 import { useCustomMimes, ALL_STATUSES } from "../hooks/useCustomMimes";
 import { SmartImport } from "./SmartImport";
+import { PluginManager } from "./PluginManager";
 import { AnimationPreview } from "./AnimationPreview";
 import type { Status } from "../types/status";
 import { readFile } from "@tauri-apps/plugin-fs";
@@ -28,6 +29,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { useClaudeConfig } from "../hooks/useClaudeConfig";
+import { useQuickClose } from "../hooks/useQuickClose";
 import { useSoundSettings } from "../hooks/useSoundSettings";
 import { useSoundOverrides } from "../hooks/useSoundOverrides";
 import { useCustomSounds, type CustomSound, MAX_SIZE_BYTES } from "../hooks/useCustomSounds";
@@ -71,17 +73,19 @@ function parseFrameSpec(spec: string): number {
 
 export { parseFrameSpec };
 
-type Tab = "general" | "mime" | "sound" | "claude" | "about";
+type Tab = "general" | "mime" | "sound" | "claude" | "plugins" | "about";
 
 const tabTitles: Record<Tab, string> = {
   general: "General",
   mime: "Mime",
   sound: "Sound",
   claude: "Claude Code",
+  plugins: "Plugins",
   about: "About",
 };
 
 export function Settings() {
+  useQuickClose();
   const { theme, setTheme } = useTheme();
   const { pet, setPet } = usePet();
   const { enabled: bubbleEnabled, setEnabled: setBubbleEnabled } = useBubble();
@@ -391,7 +395,7 @@ export function Settings() {
   return (
     <div className="settings">
       <nav className="settings-sidebar">
-        {(["general", "mime", "sound", "claude", "about"] as Tab[]).map((t) => (
+        {(["general", "mime", "sound", "claude", "plugins", "about"] as Tab[]).map((t) => (
           <button
             key={t}
             className={`sidebar-item ${tab === t ? "active" : ""}`}
@@ -1470,6 +1474,11 @@ export function Settings() {
               </>
             )}
           </>
+        )}
+        {tab === "plugins" && (
+          <div className="settings-section" data-testid="settings-tab-plugins">
+            <PluginManager />
+          </div>
         )}
         {tab === "about" && (
           <div className="settings-section">

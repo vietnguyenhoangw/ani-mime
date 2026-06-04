@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "plugin",
+  "description": "Minimal capabilities for plugin webviews (plugin-* labels). Window control and storage are mediated by the plugin_call command, not granted directly here.",
+  "windows": ["plugin-*"],
+  "permissions": [
+    "core:default",
+    "core:event:default"
+  ]
+}

@@ -181,6 +181,35 @@ export const tauriMockScript = `
     // Custom app commands
     if (cmd === 'start_visit') return null;
 
+    // Plugin manager commands
+    if (cmd === 'get_plugins') {
+      return window.__MOCK_PLUGINS__ ?? [];
+    }
+    if (cmd === 'install_plugin_from_dialog') {
+      // Test seeds the record to "install" via __MOCK_INSTALL_PLUGIN__.
+      const rec = window.__MOCK_INSTALL_PLUGIN__;
+      if (!rec) throw new Error('install canceled');
+      window.__MOCK_PLUGINS__ = [...(window.__MOCK_PLUGINS__ ?? []), rec];
+      return rec;
+    }
+    if (cmd === 'uninstall_plugin') {
+      window.__MOCK_PLUGINS__ = (window.__MOCK_PLUGINS__ ?? []).filter(
+        (p) => p.manifest.id !== args.id
+      );
+      return null;
+    }
+    if (cmd === 'set_ani_plugin_enabled') {
+      window.__MOCK_PLUGINS__ = (window.__MOCK_PLUGINS__ ?? []).map((p) =>
+        p.manifest.id === args.id ? { ...p, enabled: args.enabled } : p
+      );
+      return null;
+    }
+    if (cmd === 'launch_plugin') {
+      window.__MOCK_LAUNCHED__ = window.__MOCK_LAUNCHED__ || [];
+      window.__MOCK_LAUNCHED__.push(args.id);
+      return null;
+    }
+
     // Fallback: log and return null
     console.debug('[tauri-mock] unhandled invoke:', cmd, args);
     return null;

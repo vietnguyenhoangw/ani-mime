@@ -10,6 +10,7 @@ mod focus;
 mod helpers;
 mod logger;
 mod platform;
+mod plugin;
 mod proc_scan;
 mod server;
 mod setup;
@@ -411,9 +412,193 @@ fn start_visit(
     Ok(())
 }
 
+// --- Plugin system (Slice 1) ---
+
+#[tauri::command]
+fn install_plugin_from_dialog(app: tauri::AppHandle) -> Result<plugin::PluginRecord, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let (tx, rx) = std::sync::mpsc::channel::<Option<std::path::PathBuf>>();
+    app.dialog()
+        .file()
+        .add_filter("Plugin", &["zip"])
+        .pick_file(move |path| {
+            let _ = tx.send(path.and_then(|p| p.into_path().ok()));
+        });
+    let zip_path = match rx.recv() {
+        Ok(Some(p)) => p,
+        _ => return Err("install canceled".into()),
+    };
+
+    let root = plugin::loader::plugins_root().map_err(|e| e.to_string())?;
+    let manifest = plugin::loader::install_plugin_from_zip(&zip_path, &root)
+        .map_err(|e| e.to_string())?;
+
+    let record = plugin::PluginRecord {
+        manifest: manifest.clone(),
+        enabled: true,
+        status: plugin::loader::PluginStatus::Loaded,
+        webview_label: None,
+    };
+
+    let state = app.state::<Arc<Mutex<AppState>>>();
+    {
+        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+        guard.plugins.insert(manifest.id.clone(), record.clone());
+    }
+    let _ = app.emit("plugins-changed", ());
+    crate::app_log!("[plugin] installed {} v{}", manifest.id, manifest.version);
+    plugin::hotkey::register_record(&app, &record);
+    Ok(record)
+}
+
+#[tauri::command]
+fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let root = plugin::loader::plugins_root().map_err(|e| e.to_string())?;
+
+    // Close any open window for this plugin before tearing it down.
+    let label = plugin::runtime::webview_label_for_id(&id);
+    if let Some(win) = app.get_webview_window(&label) {
+        let _ = win.close();
+    }
+
+    let state = app.state::<Arc<Mutex<AppState>>>();
+    // Capture the hotkey before we drop the record so we can unregister it.
+    let hotkey = state
+        .lock()
+        .ok()
+        .and_then(|g| g.plugins.get(&id).and_then(plugin::hotkey::manifest_hotkey));
+
+    plugin::loader::uninstall_plugin(&id, &root).map_err(|e| e.to_string())?;
+
+    {
+        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+        guard.plugins.remove(&id);
+    }
+    if let Some(hk) = hotkey {
+        plugin::hotkey::unregister(&app, &hk);
+    }
+    let _ = app.emit("plugins-changed", ());
+    crate::app_log!("[plugin] uninstalled {}", id);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_ani_plugin_enabled(
+    app: tauri::AppHandle,
+    id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let state = app.state::<Arc<Mutex<AppState>>>();
+    let hotkey = {
+        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+        match guard.plugins.get_mut(&id) {
+            Some(rec) => {
+                rec.enabled = enabled;
+                plugin::hotkey::manifest_hotkey(rec)
+            }
+            None => return Err(format!("plugin '{}' not installed", id)),
+        }
+    };
+    if enabled {
+        // Register the launch hotkey (no-op if the plugin declares none).
+        if let Some(hk) = &hotkey {
+            plugin::hotkey::register(&app, &id, hk);
+        }
+    } else {
+        // Disabling unregisters the hotkey and closes any open window
+        // (enabling is otherwise lazy — launch on demand).
+        if let Some(hk) = &hotkey {
+            plugin::hotkey::unregister(&app, hk);
+        }
+        let label = plugin::runtime::webview_label_for_id(&id);
+        if let Some(win) = app.get_webview_window(&label) {
+            let _ = win.close();
+        }
+    }
+    crate::app_log!(
+        "[plugin] {} {}",
+        if enabled { "enabled" } else { "disabled" },
+        id
+    );
+    let _ = app.emit("plugins-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+fn get_plugins(app: tauri::AppHandle) -> Vec<plugin::PluginRecord> {
+    let state = app.state::<Arc<Mutex<AppState>>>();
+    let guard = match state.lock() {
+        Ok(g) => g,
+        Err(_) => return Vec::new(),
+    };
+    let mut out: Vec<plugin::PluginRecord> = guard.plugins.values().cloned().collect();
+    out.sort_by(|a, b| a.manifest.id.cmp(&b.manifest.id));
+    out
+}
+
+/// Reassign a plugin's launch hotkey. Persists the override (without touching
+/// the plugin's own manifest.json) and re-registers the global shortcut.
+/// Returns an error (keeping the previous hotkey) if the accelerator is
+/// invalid or already taken.
+#[tauri::command]
+fn set_plugin_hotkey(app: tauri::AppHandle, id: String, hotkey: String) -> Result<(), String> {
+    let accel = hotkey.trim().to_string();
+    if accel.is_empty() {
+        return Err("hotkey is empty".into());
+    }
+
+    let state = app.state::<Arc<Mutex<AppState>>>();
+    let (old, enabled) = {
+        let guard = state.lock().map_err(|_| "state lock poisoned")?;
+        let rec = guard
+            .plugins
+            .get(&id)
+            .ok_or_else(|| format!("plugin '{}' not installed", id))?;
+        (plugin::hotkey::manifest_hotkey(rec), rec.enabled)
+    };
+
+    // Drop the old binding, then try the new one (only meaningful while enabled).
+    if let Some(o) = &old {
+        plugin::hotkey::unregister(&app, o);
+    }
+    if enabled {
+        if let Err(e) = plugin::hotkey::try_register(&app, &id, &accel) {
+            // Restore the previous binding on failure.
+            if let Some(o) = &old {
+                plugin::hotkey::register(&app, &id, o);
+            }
+            return Err(e);
+        }
+    }
+
+    {
+        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+        if let Some(rec) = guard.plugins.get_mut(&id) {
+            rec.manifest.hotkey = Some(accel.clone());
+        }
+    }
+    plugin::hotkey::save_override(&id, &accel);
+    let _ = app.emit("plugins-changed", ());
+    crate::app_log!("[hotkey] reassigned {} -> {}", id, accel);
+    Ok(())
+}
+
+/// Temporary launch entry point for Slice 2 — spawns a plugin's WebView by id.
+/// Slice 3 will call `plugin::runtime::launch_plugin_webview` from the hotkey
+/// handler and Slice 4 from the Plugin Manager UI; this command remains useful
+/// for manual testing and "open" buttons.
+#[tauri::command]
+fn launch_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    plugin::runtime::launch_plugin_webview(&app, &id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .register_uri_scheme_protocol("plugin", |ctx, request| {
+            crate::plugin::protocol::handle_plugin_protocol(ctx.app_handle(), request)
+        })
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log::LevelFilter::Debug)
@@ -434,8 +619,9 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
-        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry])
+        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins, set_plugin_hotkey, launch_plugin, plugin::gateway::plugin_call])
         .setup(|app| {
             crate::app_log!("[app] starting Ani-Mime v{}", env!("CARGO_PKG_VERSION"));
 
@@ -607,14 +793,36 @@ pub fn run() {
                 last_task_duration_secs: 0,
                 usage_day: crate::helpers::now_secs() / 86400,
                 last_sessions_fingerprint: 0,
+                plugins: HashMap::new(),
+                clipboard_history: plugin::clipboard::load_history(),
             }));
 
             app.manage(app_state.clone());
             crate::app_log!("[app] state initialized");
 
+            match plugin::loader::plugins_root() {
+                Ok(root) => {
+                    let records = plugin::loader::scan_plugins(&root);
+                    let count = records.len();
+                    if let Ok(mut guard) = app_state.lock() {
+                        guard.plugins = records;
+                        plugin::hotkey::apply_overrides(&mut guard.plugins);
+                    }
+                    crate::app_log!("[plugin] startup scan: {} installed", count);
+                    if let Ok(guard) = app_state.lock() {
+                        plugin::hotkey::register_enabled(app.handle(), &guard.plugins);
+                    }
+                    let _ = app.emit("plugins-changed", ());
+                }
+                Err(e) => {
+                    crate::app_warn!("[plugin] could not determine plugins root: {}", e);
+                }
+            }
+
             server::start_http_server(app.handle().clone(), app_state.clone());
             watchdog::start_watchdog(app.handle().clone(), app_state.clone());
             proc_scan::start_proc_scanner(app.handle().clone(), app_state.clone());
+            plugin::clipboard::start_clipboard_monitor(app.handle().clone(), app_state.clone());
 
             // Start mDNS peer discovery
             let discovery_handle = app.handle().clone();
