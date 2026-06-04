@@ -74,5 +74,15 @@ export function usePlugins() {
     }
   }, []);
 
-  return { plugins, loading, error, install, uninstall, setEnabled, launch, refresh };
+  const setHotkey = useCallback(async (id: string, hotkey: string) => {
+    setError(null);
+    try {
+      await invoke("set_plugin_hotkey", { id, hotkey });
+    } catch (e) {
+      setError(String(e));
+    }
+    await refresh();
+  }, [refresh]);
+
+  return { plugins, loading, error, install, uninstall, setEnabled, launch, setHotkey, refresh };
 }

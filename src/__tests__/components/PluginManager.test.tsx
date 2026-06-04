@@ -44,6 +44,27 @@ describe("PluginManager", () => {
     expect(screen.queryByTestId("plugin-hotkey-screenshot")).toBeNull();
   });
 
+  it("clicking the hotkey badge records a new shortcut and reassigns it", async () => {
+    const withKey = rec("translator");
+    withKey.manifest.hotkey = "CmdOrCtrl+Shift+V";
+    mockInvoke("get_plugins", [withKey]);
+    mockInvoke("set_plugin_hotkey", null);
+    render(<PluginManager />);
+
+    const badge = await screen.findByTestId("plugin-hotkey-translator");
+    fireEvent.click(badge);
+    expect(screen.getByTestId("plugin-hotkey-translator").textContent).toMatch(/press keys/i);
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true, shiftKey: true });
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("set_plugin_hotkey", {
+        id: "translator",
+        hotkey: "CmdOrCtrl+Shift+K",
+      })
+    );
+  });
+
   it("shows an error badge with the reason for a broken plugin", async () => {
     mockInvoke("get_plugins", [rec("broken", { status: { type: "Error", reason: "bad manifest" } })]);
     render(<PluginManager />);

@@ -79,6 +79,18 @@ describe("usePlugins", () => {
     expect(invoke).toHaveBeenCalledWith("launch_plugin", { id: "translator" });
   });
 
+  it("setHotkey invokes set_plugin_hotkey with id + hotkey", async () => {
+    mockInvoke("get_plugins", []);
+    mockInvoke("set_plugin_hotkey", null);
+    const { result } = renderHook(() => usePlugins());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.setHotkey("translator", "CmdOrCtrl+Shift+K");
+    });
+    expect(invoke).toHaveBeenCalledWith("set_plugin_hotkey", { id: "translator", hotkey: "CmdOrCtrl+Shift+K" });
+  });
+
   it("install ignores a user cancel (no error set)", async () => {
     mockInvoke("get_plugins", []);
     mockInvoke("install_plugin_from_dialog", () => {

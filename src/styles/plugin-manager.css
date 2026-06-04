@@ -103,22 +103,41 @@
   gap: 8px;
 }
 
-.plugin-hotkey-spacer {
-  flex: 1;
-}
-
-/* Keyboard-shortcut badge (e.g. ⌘⇧V) shown at the footer's left. */
+/* Clickable keyboard-shortcut badge (e.g. ⌘⇧V) at the footer's left.
+   Clicking enters recording mode to reassign the shortcut. */
 .plugin-hotkey {
   font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-size: 12px;
   line-height: 1;
-  padding: 4px 8px;
+  padding: 5px 9px;
   border-radius: 6px;
   background: rgba(128, 128, 128, 0.16);
   border: 1px solid rgba(128, 128, 128, 0.2);
   color: inherit;
   white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
 }
+.plugin-hotkey:hover { background: rgba(128, 128, 128, 0.24); }
+.plugin-hotkey.recording {
+  background: rgba(0, 122, 255, 0.14);
+  border-color: #007aff;
+  color: #007aff;
+}
+
+/* "+ Shortcut" affordance for plugins with no hotkey yet. */
+.plugin-hotkey-add {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px dashed rgba(128, 128, 128, 0.4);
+  color: var(--muted, rgba(128, 128, 128, 0.8));
+  cursor: pointer;
+}
+.plugin-hotkey-add:hover { border-color: #007aff; color: #007aff; }
 
 .plugin-card.is-disabled .plugin-hotkey {
   opacity: 0.5;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePlugins } from "../hooks/usePlugins";
 import type { PluginRecord } from "../types/plugin";
 import "../styles/plugin-manager.css";
@@ -24,8 +24,38 @@ function formatHotkey(accelerator: string): string {
   return out.join(IS_MAC ? "" : "+");
 }
 
+const NAMED_KEYS: Record<string, string> = {
+  " ": "Space", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+  Enter: "Enter", Tab: "Tab", Backspace: "Backspace", Delete: "Delete",
+  ",": "Comma", ".": "Period", "/": "Slash", ";": "Semicolon", "'": "Quote",
+  "[": "BracketLeft", "]": "BracketRight", "\\": "Backslash",
+  "-": "Minus", "=": "Equal", "`": "Backquote",
+};
+
+/** The non-modifier key of a keydown, as a Tauri accelerator token, or null. */
+function mainKeyToken(e: KeyboardEvent): string | null {
+  const k = e.key;
+  if (/^[a-z]$/i.test(k)) return k.toUpperCase();
+  if (/^[0-9]$/.test(k)) return k;
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(k)) return k;
+  return NAMED_KEYS[k] ?? null;
+}
+
+/** Build a Tauri accelerator (e.g. "CmdOrCtrl+Shift+V") from a keydown, or
+ *  null if it isn't a valid shortcut (needs ≥1 modifier + a real key). */
+function buildAccelerator(e: KeyboardEvent): string | null {
+  const mods: string[] = [];
+  if (e.metaKey) mods.push("CmdOrCtrl");
+  if (e.ctrlKey) mods.push("Ctrl");
+  if (e.altKey) mods.push("Alt");
+  if (e.shiftKey) mods.push("Shift");
+  const key = mainKeyToken(e);
+  if (!key || mods.length === 0) return null;
+  return [...mods, key].join("+");
+}
+
 export function PluginManager() {
-  const { plugins, loading, error, install, uninstall, setEnabled, launch } = usePlugins();
+  const { plugins, loading, error, install, uninstall, setEnabled, launch, setHotkey } = usePlugins();
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const handleUninstall = (id: string) => {
@@ -80,6 +110,7 @@ export function PluginManager() {
               onLaunch={() => launch(p.manifest.id)}
               onToggle={() => setEnabled(p.manifest.id, !p.enabled)}
               onUninstall={() => handleUninstall(p.manifest.id)}
+              onSetHotkey={(accel) => setHotkey(p.manifest.id, accel)}
             />
           ))}
         </div>
@@ -94,16 +125,40 @@ function PluginCard({
   onLaunch,
   onToggle,
   onUninstall,
+  onSetHotkey,
 }: {
   record: PluginRecord;
   confirming: boolean;
   onLaunch: () => void;
   onToggle: () => void;
   onUninstall: () => void;
+  onSetHotkey: (accelerator: string) => void;
 }) {
   const { manifest, enabled, status } = record;
   const isError = status.type === "Error";
   const errorReason = status.type === "Error" ? status.reason : null;
+  const [recording, setRecording] = useState(false);
+
+  useEffect(() => {
+    if (!recording) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        setRecording(false);
+        return;
+      }
+      // Ignore lone modifier presses — wait for a real key.
+      if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
+      const accel = buildAccelerator(e);
+      if (accel) {
+        setRecording(false);
+        onSetHotkey(accel);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [recording, onSetHotkey]);
 
   return (
     <div
@@ -150,16 +205,35 @@ function PluginCard({
       )}
 
       <div className="plugin-card-foot">
-        {manifest.hotkey ? (
-          <kbd
+        {recording ? (
+          <button
+            type="button"
+            className="plugin-hotkey recording"
+            data-testid={`plugin-hotkey-${manifest.id}`}
+            onClick={() => setRecording(false)}
+          >
+            Press keys… (Esc)
+          </button>
+        ) : manifest.hotkey ? (
+          <button
+            type="button"
             className="plugin-hotkey"
             data-testid={`plugin-hotkey-${manifest.id}`}
-            title={`Press ${manifest.hotkey} to open ${manifest.name}`}
+            title="Click to reassign shortcut"
+            onClick={() => setRecording(true)}
           >
             {formatHotkey(manifest.hotkey)}
-          </kbd>
+          </button>
         ) : (
-          <span className="plugin-hotkey-spacer" />
+          <button
+            type="button"
+            className="plugin-hotkey-add"
+            data-testid={`plugin-hotkey-add-${manifest.id}`}
+            title="Set a launch shortcut"
+            onClick={() => setRecording(true)}
+          >
+            + Shortcut
+          </button>
         )}
         <div className="plugin-foot-actions">
           <button

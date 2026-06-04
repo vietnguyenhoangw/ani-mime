@@ -537,6 +537,53 @@ fn get_plugins(app: tauri::AppHandle) -> Vec<plugin::PluginRecord> {
     out
 }
 
+/// Reassign a plugin's launch hotkey. Persists the override (without touching
+/// the plugin's own manifest.json) and re-registers the global shortcut.
+/// Returns an error (keeping the previous hotkey) if the accelerator is
+/// invalid or already taken.
+#[tauri::command]
+fn set_plugin_hotkey(app: tauri::AppHandle, id: String, hotkey: String) -> Result<(), String> {
+    let accel = hotkey.trim().to_string();
+    if accel.is_empty() {
+        return Err("hotkey is empty".into());
+    }
+
+    let state = app.state::<Arc<Mutex<AppState>>>();
+    let (old, enabled) = {
+        let guard = state.lock().map_err(|_| "state lock poisoned")?;
+        let rec = guard
+            .plugins
+            .get(&id)
+            .ok_or_else(|| format!("plugin '{}' not installed", id))?;
+        (plugin::hotkey::manifest_hotkey(rec), rec.enabled)
+    };
+
+    // Drop the old binding, then try the new one (only meaningful while enabled).
+    if let Some(o) = &old {
+        plugin::hotkey::unregister(&app, o);
+    }
+    if enabled {
+        if let Err(e) = plugin::hotkey::try_register(&app, &id, &accel) {
+            // Restore the previous binding on failure.
+            if let Some(o) = &old {
+                plugin::hotkey::register(&app, &id, o);
+            }
+            return Err(e);
+        }
+    }
+
+    {
+        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+        if let Some(rec) = guard.plugins.get_mut(&id) {
+            rec.manifest.hotkey = Some(accel.clone());
+        }
+    }
+    plugin::hotkey::save_override(&id, &accel);
+    let _ = app.emit("plugins-changed", ());
+    crate::app_log!("[hotkey] reassigned {} -> {}", id, accel);
+    Ok(())
+}
+
 /// Temporary launch entry point for Slice 2 — spawns a plugin's WebView by id.
 /// Slice 3 will call `plugin::runtime::launch_plugin_webview` from the hotkey
 /// handler and Slice 4 from the Plugin Manager UI; this command remains useful
@@ -574,7 +621,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
-        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins, launch_plugin, plugin::gateway::plugin_call])
+        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins, set_plugin_hotkey, launch_plugin, plugin::gateway::plugin_call])
         .setup(|app| {
             crate::app_log!("[app] starting Ani-Mime v{}", env!("CARGO_PKG_VERSION"));
 
@@ -759,6 +806,7 @@ pub fn run() {
                     let count = records.len();
                     if let Ok(mut guard) = app_state.lock() {
                         guard.plugins = records;
+                        plugin::hotkey::apply_overrides(&mut guard.plugins);
                     }
                     crate::app_log!("[plugin] startup scan: {} installed", count);
                     if let Ok(guard) = app_state.lock() {
