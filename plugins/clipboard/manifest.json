@@ -1,7 +1,7 @@
 {
   "id": "clipboard",
   "name": "Clipboard Manager",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "System clipboard history — your last 20 copies, ready to paste back.",
   "author": "ani-mime",
   "entry": "index.html",
