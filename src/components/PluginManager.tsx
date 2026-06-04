@@ -85,30 +85,15 @@ function PluginCard({
   const errorReason = status.type === "Error" ? status.reason : null;
 
   return (
-    <div className="settings-card plugin-card" data-testid={`plugin-card-${manifest.id}`}>
-      <div className="plugin-card-info">
-        <span className="settings-row-label plugin-card-title">
+    <div
+      className={`settings-card plugin-card ${enabled ? "" : "is-disabled"}`}
+      data-testid={`plugin-card-${manifest.id}`}
+    >
+      <div className="plugin-card-head">
+        <span className="plugin-name">
           {manifest.name}
           <span className="plugin-version">v{manifest.version}</span>
         </span>
-        {manifest.description && (
-          <span className="settings-row-hint">{manifest.description}</span>
-        )}
-        <div className="plugin-caps">
-          {manifest.capabilities.map((c) => (
-            <span key={c} className="plugin-cap-chip" data-testid={`plugin-cap-${manifest.id}-${c}`}>
-              {c}
-            </span>
-          ))}
-        </div>
-        {errorReason && (
-          <span className="plugin-error" data-testid={`plugin-error-${manifest.id}`}>
-            {errorReason}
-          </span>
-        )}
-      </div>
-
-      <div className="plugin-card-actions">
         <button
           type="button"
           role="switch"
@@ -121,6 +106,29 @@ function PluginCard({
         >
           <span className="toggle-knob" />
         </button>
+      </div>
+
+      {manifest.description && (
+        <p className="plugin-desc">{manifest.description}</p>
+      )}
+
+      {manifest.capabilities.length > 0 && (
+        <div className="plugin-caps">
+          {manifest.capabilities.map((c) => (
+            <span key={c} className="plugin-cap-chip" data-testid={`plugin-cap-${manifest.id}-${c}`}>
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {errorReason && (
+        <p className="plugin-error" data-testid={`plugin-error-${manifest.id}`}>
+          {errorReason}
+        </p>
+      )}
+
+      <div className="plugin-card-foot">
         <button
           type="button"
           className="settings-action-btn"

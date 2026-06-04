@@ -14,25 +14,33 @@
   gap: 8px;
 }
 
-/* A plugin row: info on the left, actions on the right. */
+/* Each plugin is a header / body / footer card. */
 .plugin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plugin-card.is-disabled .plugin-name,
+.plugin-card.is-disabled .plugin-desc,
+.plugin-card.is-disabled .plugin-caps {
+  opacity: 0.5;
+}
+
+/* Header: name + version on the left, enable toggle on the right. */
+.plugin-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.plugin-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.plugin-card-title {
+.plugin-name {
+  font-weight: 600;
   display: flex;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
 }
 
 .plugin-version {
@@ -41,24 +49,29 @@
   opacity: 0.5;
 }
 
+.plugin-desc {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 .plugin-caps {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 2px;
 }
 
 .plugin-cap-chip {
   font-size: 11px;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: 999px;
   background: rgba(128, 128, 128, 0.18);
 }
 
 .plugin-error {
+  margin: 0;
   font-size: 12px;
   color: #ff3b30;
-  margin-top: 2px;
 }
 
 .plugin-error-banner {
@@ -69,11 +82,13 @@
   font-size: 13px;
 }
 
-.plugin-card-actions {
+/* Footer: actions right-aligned, separated from the body by a hairline. */
+.plugin-card-foot {
   display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  flex-shrink: 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
 }
 
 /* Uninstall reuses .settings-action-btn; turns red while awaiting confirm. */
