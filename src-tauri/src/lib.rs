@@ -501,6 +501,15 @@ fn get_plugins(app: tauri::AppHandle) -> Vec<plugin::PluginRecord> {
     out
 }
 
+/// Temporary launch entry point for Slice 2 — spawns a plugin's WebView by id.
+/// Slice 3 will call `plugin::runtime::launch_plugin_webview` from the hotkey
+/// handler and Slice 4 from the Plugin Manager UI; this command remains useful
+/// for manual testing and "open" buttons.
+#[tauri::command]
+fn launch_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    plugin::runtime::launch_plugin_webview(&app, &id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -528,7 +537,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
-        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins])
+        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins, launch_plugin, plugin::gateway::plugin_call])
         .setup(|app| {
             crate::app_log!("[app] starting Ani-Mime v{}", env!("CARGO_PKG_VERSION"));
 
