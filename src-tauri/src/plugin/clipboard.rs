@@ -106,6 +106,7 @@ pub fn start_clipboard_monitor(app: tauri::AppHandle, state: Arc<Mutex<AppState>
         // Seed `last` with whatever's already on the clipboard so we don't
         // re-capture the pre-existing value on first tick.
         let mut last: Option<String> = clipboard.get_text().ok();
+        let mut was_demanded: Option<bool> = None;
 
         loop {
             std::thread::sleep(Duration::from_millis(800));
@@ -115,6 +116,13 @@ pub fn start_clipboard_monitor(app: tauri::AppHandle, state: Arc<Mutex<AppState>
                 Ok(g) => capture_demanded(&g),
                 Err(_) => continue,
             };
+            if was_demanded != Some(demanded) {
+                was_demanded = Some(demanded);
+                crate::app_log!(
+                    "[clipboard] capture {}",
+                    if demanded { "enabled (a clipboard plugin is on)" } else { "paused (no enabled clipboard plugin)" }
+                );
+            }
             if !demanded {
                 continue;
             }
@@ -141,6 +149,7 @@ pub fn start_clipboard_monitor(app: tauri::AppHandle, state: Arc<Mutex<AppState>
             if changed {
                 let snapshot = state.lock().map(|g| g.clipboard_history.clone()).unwrap_or_default();
                 save_history(&snapshot);
+                crate::app_log!("[clipboard] captured {} chars (history: {})", text.len(), snapshot.len());
                 let _ = app.emit("clipboard-changed", ());
             }
         }
