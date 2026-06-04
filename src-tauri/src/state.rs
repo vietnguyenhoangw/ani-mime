@@ -138,6 +138,10 @@ pub struct AppState {
     /// Installed plugins, keyed by manifest `id`. Populated at startup by
     /// `plugin::loader::scan_plugins` and mutated by install/uninstall.
     pub plugins: HashMap<String, PluginRecord>,
+    /// OS clipboard history (newest first, capped at 20), captured by the
+    /// `plugin::clipboard` monitor while a `clipboard`-capable plugin is
+    /// enabled. Exposed to plugins via the `clipboard` capability.
+    pub clipboard_history: Vec<String>,
 }
 
 /// Deterministic hash of the session fields the UI renders. Pids are sorted so

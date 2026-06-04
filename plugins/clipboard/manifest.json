@@ -2,14 +2,14 @@
   "id": "clipboard",
   "name": "Clipboard Manager",
   "version": "0.1.0",
-  "description": "Save snippets of copied text and paste them back with one click.",
+  "description": "System clipboard history — your last 20 copies, ready to paste back.",
   "author": "ani-mime",
   "entry": "index.html",
   "hotkey": "CmdOrCtrl+Shift+V",
-  "capabilities": ["window", "storage"],
+  "capabilities": ["window", "clipboard"],
   "window": {
     "width": 440,
-    "height": 480,
+    "height": 520,
     "resizable": true,
     "alwaysOnTop": true,
     "decorations": true

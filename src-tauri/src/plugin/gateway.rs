@@ -91,6 +91,41 @@ pub fn plugin_call(
             }
             Ok(serde_json::Value::Null)
         }
+        "clipboard" => {
+            match method.as_str() {
+                "history" => {
+                    let state = window.state::<Arc<Mutex<AppState>>>();
+                    let guard = state.lock().map_err(|_| "state lock poisoned")?;
+                    Ok(serde_json::json!(guard.clipboard_history.clone()))
+                }
+                "copy" => {
+                    let text = arg_str(&args, "text")?;
+                    crate::plugin::clipboard::write_clipboard(&text)?;
+                    Ok(serde_json::Value::Null)
+                }
+                "remove" => {
+                    let text = arg_str(&args, "text")?;
+                    let snapshot = {
+                        let state = window.state::<Arc<Mutex<AppState>>>();
+                        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+                        guard.clipboard_history.retain(|s| s != &text);
+                        guard.clipboard_history.clone()
+                    };
+                    crate::plugin::clipboard::save_history(&snapshot);
+                    Ok(serde_json::Value::Null)
+                }
+                "clear" => {
+                    {
+                        let state = window.state::<Arc<Mutex<AppState>>>();
+                        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+                        guard.clipboard_history.clear();
+                    }
+                    crate::plugin::clipboard::save_history(&[]);
+                    Ok(serde_json::Value::Null)
+                }
+                other => Err(format!("unknown clipboard method '{}'", other)),
+            }
+        }
         other => Err(format!("unknown capability '{}'", other)),
     }
 }

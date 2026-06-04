@@ -47,6 +47,12 @@ pub const ANI_SDK_JS: &str = r#"
       get: function (key) { return invoke('storage', 'get', { key: key }); },
       set: function (key, value) { return invoke('storage', 'set', { key: key, value: value }); },
       delete: function (key) { return invoke('storage', 'delete', { key: key }); }
+    },
+    clipboard: {
+      history: function () { return invoke('clipboard', 'history'); },
+      copy: function (text) { return invoke('clipboard', 'copy', { text: text }); },
+      remove: function (text) { return invoke('clipboard', 'remove', { text: text }); },
+      clear: function () { return invoke('clipboard', 'clear'); }
     }
   };
 

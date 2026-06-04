@@ -23,7 +23,7 @@ plugins/
 
 | Plugin | What it does |
 |--------|--------------|
-| [`clipboard`](./clipboard) | Save snippets of copied text and paste them back with one click |
+| [`clipboard`](./clipboard) | System clipboard history — your last 20 copies, ready to paste back |
 
 ## Authoring a plugin
 

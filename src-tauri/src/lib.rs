@@ -724,6 +724,7 @@ pub fn run() {
                 usage_day: crate::helpers::now_secs() / 86400,
                 last_sessions_fingerprint: 0,
                 plugins: HashMap::new(),
+                clipboard_history: plugin::clipboard::load_history(),
             }));
 
             app.manage(app_state.clone());
@@ -747,6 +748,7 @@ pub fn run() {
             server::start_http_server(app.handle().clone(), app_state.clone());
             watchdog::start_watchdog(app.handle().clone(), app_state.clone());
             proc_scan::start_proc_scanner(app.handle().clone(), app_state.clone());
+            plugin::clipboard::start_clipboard_monitor(app.handle().clone(), app_state.clone());
 
             // Start mDNS peer discovery
             let discovery_handle = app.handle().clone();

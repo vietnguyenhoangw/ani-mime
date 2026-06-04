@@ -60,6 +60,7 @@ Peer announces ←UDP :1235 (mDNS + multicast + unicast scan)→ AppState.peers 
 | `plugin/runtime.rs` | Spawns a per-plugin WebView (`plugin://<id>/<entry>`), injects the `window.ani` SDK, maps plugin id ↔ `plugin-<id>` window label |
 | `plugin/gateway.rs` | `plugin_call` command — the single gated entry point for `window.ani`; checks declared capabilities, dispatches to storage / window ops |
 | `plugin/storage.rs` | Per-plugin key/value store at `~/.ani-mime/plugins/<id>/data/store.json` |
+| `plugin/clipboard.rs` | Background OS-clipboard monitor (arboard) + history (deduped, capped 20, persisted to `~/.ani-mime/clipboard-history.json`); runs only while a `clipboard`-capable plugin is enabled; exposed via the `clipboard` capability |
 
 ### MCP Server (`src-tauri/mcp-server/`)
 

@@ -38,39 +38,22 @@
       -webkit-user-select: none;
       user-select: none;
     }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     h1 { font-size: 14px; margin: 0; font-weight: 600; }
-    .row { display: flex; gap: 8px; }
+    .sub { color: var(--muted); font-size: 11px; margin: 0; }
     button {
       font: inherit;
       color: var(--text);
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 7px;
-      padding: 6px 10px;
+      padding: 5px 10px;
       cursor: pointer;
       transition: background 0.12s;
       white-space: nowrap;
     }
     button:hover:not(:disabled) { background: var(--surface-hover); }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    button.primary { background: var(--accent); border-color: transparent; color: #fff; }
-    button.primary:hover { background: #0a84ff; }
     button.danger { color: var(--danger); }
-    textarea {
-      font: inherit;
-      color: var(--text);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 8px;
-      resize: none;
-      width: 100%;
-      min-height: 52px;
-      -webkit-user-select: text;
-      user-select: text;
-    }
-    .toolbar { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
-    .toolbar-left { display: flex; gap: 8px; }
     .list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
     .item {
       background: var(--surface);
@@ -78,24 +61,27 @@
       border-radius: 8px;
       padding: 8px 10px;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 8px;
+      cursor: pointer;
     }
+    .item:hover { background: var(--surface-hover); }
     .item-text {
       flex: 1;
       min-width: 0;
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: 3.6em;
+      max-height: 2.9em;
       overflow: hidden;
       -webkit-user-select: text;
       user-select: text;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 12px;
     }
+    .item-index { color: var(--muted); font-size: 11px; flex-shrink: 0; width: 18px; text-align: right; }
     .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
-    .item-actions button { padding: 4px 8px; font-size: 12px; }
-    .empty { color: var(--muted); text-align: center; padding: 24px 8px; }
+    .item-actions button { padding: 3px 8px; font-size: 12px; }
+    .empty { color: var(--muted); text-align: center; padding: 28px 8px; line-height: 1.6; }
     .toast {
       position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
       background: var(--text); color: var(--bg);
@@ -103,181 +89,148 @@
       opacity: 0; transition: opacity 0.2s; pointer-events: none;
     }
     .toast.show { opacity: 0.95; }
-    .count { color: var(--muted); font-size: 12px; }
   </style>
 </head>
 <body>
-  <h1>Clipboard Manager</h1>
-
-  <div class="row">
-    <button id="grab" class="primary" style="flex:1">Save current clipboard</button>
-  </div>
-
-  <textarea id="entry" placeholder="…or type/paste text here, then Save text"></textarea>
-  <div class="row">
-    <button id="save-text" style="flex:1">Save text</button>
-  </div>
-
-  <div class="toolbar">
-    <span class="count" id="count">0 saved</span>
-    <button id="clear" class="danger">Clear all</button>
-  </div>
+  <header>
+    <div>
+      <h1>Clipboard History</h1>
+      <p class="sub">Your last 20 copies — click an item to copy it back.</p>
+    </div>
+    <button id="clear" class="danger">Clear</button>
+  </header>
 
   <ul class="list" id="list"></ul>
-
   <div class="toast" id="toast"></div>
 
   <script>
-    const STORE_KEY = "history";
-    const MAX_ITEMS = 100;
-
     const $ = (id) => document.getElementById(id);
     const listEl = $("list");
-    const countEl = $("count");
     const toastEl = $("toast");
 
-    let history = [];
     let confirmingClear = false;
+    let lastJSON = "";
 
     function toast(msg) {
       toastEl.textContent = msg;
       toastEl.classList.add("show");
       clearTimeout(toast._t);
-      toast._t = setTimeout(() => toastEl.classList.remove("show"), 1400);
+      toast._t = setTimeout(() => toastEl.classList.remove("show"), 1300);
     }
 
-    async function load() {
+    async function getHistory() {
       try {
-        history = (await window.ani.storage.get(STORE_KEY)) || [];
-        if (!Array.isArray(history)) history = [];
+        const h = await window.ani.clipboard.history();
+        return Array.isArray(h) ? h : [];
       } catch (e) {
-        history = [];
+        return [];
       }
-      render();
     }
 
-    async function persist() {
+    async function copyItem(text) {
       try {
-        await window.ani.storage.set(STORE_KEY, history);
-      } catch (e) {
-        toast("Could not save");
-      }
-    }
-
-    function addEntry(text) {
-      const trimmed = (text || "").replace(/\s+$/g, "");
-      if (!trimmed.trim()) {
-        toast("Nothing to save");
-        return false;
-      }
-      // Skip if identical to the most recent entry.
-      if (history[0] && history[0].text === trimmed) {
-        toast("Already at top");
-        return false;
-      }
-      history.unshift({ id: String(Date.now()) + Math.random().toString(16).slice(2), text: trimmed });
-      if (history.length > MAX_ITEMS) history.length = MAX_ITEMS;
-      persist();
-      render();
-      return true;
-    }
-
-    async function grabClipboard() {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (addEntry(text)) toast("Saved from clipboard");
-      } catch (e) {
-        toast("Can't read clipboard — paste into the box below");
-        $("entry").focus();
-      }
-    }
-
-    async function copyOut(text) {
-      try {
-        await navigator.clipboard.writeText(text);
-        toast("Copied to clipboard");
+        await window.ani.clipboard.copy(text);
+        toast("Copied — now paste anywhere");
+        refresh();
       } catch (e) {
         toast("Copy failed");
       }
     }
 
-    function removeItem(id) {
-      history = history.filter((h) => h.id !== id);
-      persist();
-      render();
+    async function removeItem(text) {
+      try {
+        await window.ani.clipboard.remove(text);
+        refresh();
+      } catch (e) {
+        toast("Remove failed");
+      }
     }
 
-    function render() {
-      countEl.textContent = history.length + (history.length === 1 ? " saved" : " saved");
+    function render(history) {
+      // Skip re-render if nothing changed (keeps the poll cheap + avoids flicker).
+      const json = JSON.stringify(history);
+      if (json === lastJSON) return;
+      lastJSON = json;
+
       listEl.innerHTML = "";
 
       if (history.length === 0) {
         const li = document.createElement("li");
         li.className = "empty";
-        li.textContent = "No snippets yet. Copy something, then “Save current clipboard”.";
+        li.textContent = "Nothing copied yet. Copy text in any app and it shows up here.";
         listEl.appendChild(li);
         return;
       }
 
-      for (const item of history) {
+      history.forEach((text, i) => {
         const li = document.createElement("li");
         li.className = "item";
+        li.title = "Click to copy back";
+        li.addEventListener("click", (e) => {
+          if (e.target.closest(".item-actions")) return;
+          copyItem(text);
+        });
+
+        const idx = document.createElement("span");
+        idx.className = "item-index";
+        idx.textContent = i + 1;
 
         const txt = document.createElement("div");
         txt.className = "item-text";
-        txt.textContent = item.text;
+        txt.textContent = text;
 
         const actions = document.createElement("div");
         actions.className = "item-actions";
 
         const copyBtn = document.createElement("button");
         copyBtn.textContent = "Copy";
-        copyBtn.addEventListener("click", () => copyOut(item.text));
+        copyBtn.addEventListener("click", () => copyItem(text));
 
         const delBtn = document.createElement("button");
         delBtn.className = "danger";
         delBtn.textContent = "✕";
-        delBtn.title = "Delete";
-        delBtn.addEventListener("click", () => removeItem(item.id));
+        delBtn.title = "Remove";
+        delBtn.addEventListener("click", () => removeItem(text));
 
         actions.appendChild(copyBtn);
         actions.appendChild(delBtn);
+        li.appendChild(idx);
         li.appendChild(txt);
         li.appendChild(actions);
         listEl.appendChild(li);
-      }
+      });
     }
 
-    $("grab").addEventListener("click", grabClipboard);
+    async function refresh() {
+      render(await getHistory());
+    }
 
-    $("save-text").addEventListener("click", () => {
-      const el = $("entry");
-      if (addEntry(el.value)) {
-        el.value = "";
-        toast("Saved");
-      }
-    });
-
-    $("clear").addEventListener("click", () => {
-      if (history.length === 0) return;
+    $("clear").addEventListener("click", async () => {
       if (!confirmingClear) {
         confirmingClear = true;
-        $("clear").textContent = "Confirm clear?";
+        $("clear").textContent = "Confirm?";
         setTimeout(() => {
           confirmingClear = false;
-          $("clear").textContent = "Clear all";
+          $("clear").textContent = "Clear";
         }, 2500);
         return;
       }
       confirmingClear = false;
-      $("clear").textContent = "Clear all";
-      history = [];
-      persist();
-      render();
-      toast("Cleared");
+      $("clear").textContent = "Clear";
+      try {
+        await window.ani.clipboard.clear();
+        lastJSON = "";
+        refresh();
+        toast("Cleared");
+      } catch (e) {
+        toast("Clear failed");
+      }
     });
 
-    load();
+    // Live view: poll the host history while the window is open.
+    refresh();
+    setInterval(refresh, 1000);
+    window.addEventListener("focus", refresh);
   </script>
 </body>
 </html>

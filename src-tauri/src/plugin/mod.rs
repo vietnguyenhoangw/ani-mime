@@ -6,6 +6,7 @@
 //! dispatcher (`gateway`), and per-plugin key/value storage (`storage`).
 //! Not yet: global hotkeys (Slice 3) and the Plugin Manager UI (Slice 4).
 
+pub mod clipboard;
 pub mod gateway;
 pub mod loader;
 pub mod manifest;
