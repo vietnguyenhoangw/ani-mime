@@ -17,10 +17,17 @@ fn store_path(data_dir: &Path) -> PathBuf {
 fn read_store(data_dir: &Path) -> Map<String, Value> {
     let path = store_path(data_dir);
     match std::fs::read_to_string(&path) {
-        Ok(s) => serde_json::from_str::<Value>(&s)
-            .ok()
-            .and_then(|v| v.as_object().cloned())
-            .unwrap_or_default(),
+        Ok(s) => match serde_json::from_str::<Value>(&s) {
+            Ok(v) => v.as_object().cloned().unwrap_or_default(),
+            Err(e) => {
+                crate::app_warn!(
+                    "[plugin] storage parse failed at {}: {} — treating as empty",
+                    path.display(),
+                    e
+                );
+                Map::new()
+            }
+        },
         Err(_) => Map::new(),
     }
 }

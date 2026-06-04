@@ -82,6 +82,7 @@ pub fn plugin_call(
                 "resize" => {
                     let w = arg_u32(&args, "width")?;
                     let h = arg_u32(&args, "height")?;
+                    let (w, h) = checked_window_size(w, h)?;
                     window
                         .set_size(tauri::LogicalSize::new(w as f64, h as f64))
                         .map_err(|e| e.to_string())?;
@@ -106,6 +107,22 @@ fn arg_u32(args: &serde_json::Value, key: &str) -> Result<u32, String> {
         .and_then(|v| v.as_u64())
         .map(|n| n as u32)
         .ok_or_else(|| format!("missing numeric arg '{}'", key))
+}
+
+/// Validate a runtime resize request against the same bounds the manifest
+/// enforces at install time. Rejects zero and oversized dimensions.
+fn checked_window_size(width: u32, height: u32) -> Result<(u32, u32), String> {
+    use crate::plugin::manifest::{MAX_WINDOW_WIDTH, MAX_WINDOW_HEIGHT};
+    if width == 0 || height == 0 {
+        return Err("resize: width and height must be positive".into());
+    }
+    if width > MAX_WINDOW_WIDTH || height > MAX_WINDOW_HEIGHT {
+        return Err(format!(
+            "resize: dimensions exceed {}x{}",
+            MAX_WINDOW_WIDTH, MAX_WINDOW_HEIGHT
+        ));
+    }
+    Ok((width, height))
 }
 
 #[cfg(test)]
@@ -158,5 +175,29 @@ mod tests {
     fn rejects_when_disabled() {
         let rec = record(&["storage"], false);
         assert!(capability_allowed(&rec, "storage").is_err());
+    }
+
+    #[test]
+    fn arg_str_extracts_and_rejects() {
+        let args = serde_json::json!({ "key": "hello" });
+        assert_eq!(arg_str(&args, "key").unwrap(), "hello");
+        assert!(arg_str(&args, "missing").is_err());
+        assert!(arg_str(&serde_json::json!({ "key": 5 }), "key").is_err());
+    }
+
+    #[test]
+    fn arg_u32_extracts_and_rejects() {
+        let args = serde_json::json!({ "width": 480 });
+        assert_eq!(arg_u32(&args, "width").unwrap(), 480);
+        assert!(arg_u32(&args, "missing").is_err());
+        assert!(arg_u32(&serde_json::json!({ "width": "no" }), "width").is_err());
+    }
+
+    #[test]
+    fn checked_window_size_enforces_bounds() {
+        assert!(checked_window_size(0, 100).is_err());
+        assert!(checked_window_size(100, 0).is_err());
+        assert!(checked_window_size(99999, 100).is_err());
+        assert_eq!(checked_window_size(480, 320).unwrap(), (480, 320));
     }
 }

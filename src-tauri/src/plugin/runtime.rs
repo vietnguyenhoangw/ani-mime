@@ -74,8 +74,8 @@ pub fn launch_plugin_webview(app: &tauri::AppHandle, id: &str) -> Result<(), Str
         return Ok(());
     }
 
-    // Read entry + window config from state, then release the lock.
-    let (entry, wcfg) = {
+    // Read name + entry + window config from state, then release the lock.
+    let (name, entry, wcfg) = {
         let state = app.state::<Arc<Mutex<AppState>>>();
         let guard = state.lock().map_err(|_| "state lock poisoned")?;
         let rec = guard
@@ -88,7 +88,11 @@ pub fn launch_plugin_webview(app: &tauri::AppHandle, id: &str) -> Result<(), Str
         if let PluginStatus::Error(reason) = &rec.status {
             return Err(format!("plugin in error state: {}", reason));
         }
-        (rec.manifest.entry.clone(), rec.manifest.window.clone())
+        (
+            rec.manifest.name.clone(),
+            rec.manifest.entry.clone(),
+            rec.manifest.window.clone(),
+        )
     };
 
     let url = format!("plugin://{}/{}", id, entry);
@@ -97,7 +101,7 @@ pub fn launch_plugin_webview(app: &tauri::AppHandle, id: &str) -> Result<(), Str
         .map_err(|e| format!("invalid plugin url '{}': {}", url, e))?;
 
     let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::CustomProtocol(parsed))
-        .title(&label)
+        .title(&name)
         .inner_size(wcfg.width as f64, wcfg.height as f64)
         .resizable(wcfg.resizable)
         .always_on_top(wcfg.always_on_top)

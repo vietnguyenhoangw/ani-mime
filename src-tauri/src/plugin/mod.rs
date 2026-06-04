@@ -1,8 +1,10 @@
 //! Plugin system (mini-app extensions).
 //!
-//! Slice 1 scope: manifest parsing, filesystem operations
-//! (install/uninstall, startup scan), and the `plugin://` URI
-//! scheme handler. No WebView, no hotkeys, no UI yet.
+//! Backend: manifest parsing/validation, install/uninstall, startup scan,
+//! the `plugin://` URI scheme (`protocol`), per-plugin WebView spawning and
+//! the injected `window.ani` SDK (`runtime`), the gated `plugin_call`
+//! dispatcher (`gateway`), and per-plugin key/value storage (`storage`).
+//! Not yet: global hotkeys (Slice 3) and the Plugin Manager UI (Slice 4).
 
 pub mod gateway;
 pub mod loader;

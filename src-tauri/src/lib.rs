@@ -454,6 +454,13 @@ fn install_plugin_from_dialog(app: tauri::AppHandle) -> Result<plugin::PluginRec
 #[tauri::command]
 fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let root = plugin::loader::plugins_root().map_err(|e| e.to_string())?;
+
+    // Close any open window for this plugin before tearing it down.
+    let label = plugin::runtime::webview_label_for_id(&id);
+    if let Some(win) = app.get_webview_window(&label) {
+        let _ = win.close();
+    }
+
     plugin::loader::uninstall_plugin(&id, &root).map_err(|e| e.to_string())?;
 
     let state = app.state::<Arc<Mutex<AppState>>>();
@@ -478,6 +485,13 @@ fn set_ani_plugin_enabled(
         match guard.plugins.get_mut(&id) {
             Some(rec) => rec.enabled = enabled,
             None => return Err(format!("plugin '{}' not installed", id)),
+        }
+    }
+    // Disabling closes any open window (enabling is lazy — launch on demand).
+    if !enabled {
+        let label = plugin::runtime::webview_label_for_id(&id);
+        if let Some(win) = app.get_webview_window(&label) {
+            let _ = win.close();
         }
     }
     crate::app_log!(
