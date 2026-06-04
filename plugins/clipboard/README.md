@@ -1,4 +1,4 @@
-# Clipboard Manager — example plugin
+# Clipboard Manager
 
 A minimal Ani-Mime plugin that demonstrates the `window.ani` SDK: it saves
 snippets of copied text and pastes them back with one click. Two files, no
@@ -29,13 +29,13 @@ clipboard/
 **Option A — drop in the plugins folder** (picked up on next launch):
 
 ```bash
-cp -R examples/plugins/clipboard ~/.ani-mime/plugins/clipboard
+cp -R plugins/clipboard ~/.ani-mime/plugins/clipboard
 ```
 
 **Option B — zip and use Settings → Plugins → "Install…"**:
 
 ```bash
-cd examples/plugins/clipboard
+cd plugins/clipboard
 zip -r ../clipboard.zip manifest.json index.html
 # then pick clipboard.zip in the installer
 ```
