@@ -1,0 +1,24 @@
+.plugin-manager { display: flex; flex-direction: column; gap: 12px; }
+.plugin-manager-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.plugin-manager-desc { margin: 0; font-size: 13px; opacity: 0.8; }
+.plugin-install-btn { padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.plugin-error-banner { padding: 8px 10px; border-radius: 6px; background: rgba(220, 60, 60, 0.12); color: #b00020; font-size: 13px; }
+.plugin-loading, .plugin-empty { opacity: 0.6; font-size: 13px; }
+.plugin-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.plugin-card { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid rgba(128,128,128,0.25); border-radius: 8px; }
+.plugin-card-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.plugin-card-title { display: flex; align-items: baseline; gap: 8px; }
+.plugin-name { font-weight: 600; }
+.plugin-version { font-size: 12px; opacity: 0.6; }
+.plugin-card-desc { margin: 0; font-size: 12px; opacity: 0.8; }
+.plugin-caps { display: flex; flex-wrap: wrap; gap: 4px; }
+.plugin-cap-chip { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: rgba(128,128,128,0.18); }
+.plugin-error { margin: 2px 0 0; font-size: 12px; color: #b00020; }
+.plugin-card-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.plugin-toggle { min-width: 44px; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+.plugin-toggle.on { background: rgba(60, 180, 90, 0.2); }
+.plugin-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+.plugin-launch-btn { padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+.plugin-launch-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.plugin-uninstall-btn { padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+.plugin-uninstall-btn.confirming { background: rgba(220, 60, 60, 0.18); color: #b00020; }
