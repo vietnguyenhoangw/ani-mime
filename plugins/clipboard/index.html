@@ -69,16 +69,15 @@
     .item-text {
       flex: 1;
       min-width: 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-height: 2.9em;
+      white-space: nowrap;
       overflow: hidden;
+      text-overflow: ellipsis;
       -webkit-user-select: text;
       user-select: text;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 12px;
     }
-    .item-index { color: var(--muted); font-size: 11px; flex-shrink: 0; width: 18px; text-align: right; }
+    .item-index { color: var(--muted); font-size: 11px; flex-shrink: 0; width: 18px; text-align: center; }
     .item-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .item-actions button { padding: 3px 8px; font-size: 12px; }
     .empty { color: var(--muted); text-align: center; padding: 28px 8px; line-height: 1.6; }
@@ -177,7 +176,9 @@
 
         const txt = document.createElement("div");
         txt.className = "item-text";
-        txt.textContent = text;
+        // Single-line preview: collapse whitespace/newlines; full text on hover.
+        txt.textContent = text.replace(/\s+/g, " ").trim();
+        txt.title = text;
 
         const actions = document.createElement("div");
         actions.className = "item-actions";
