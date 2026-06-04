@@ -1,6 +1,11 @@
 //! Plugin WebView runtime: id↔label mapping, the injected `window.ani`
 //! SDK script, and the spawn function used by the `launch_plugin` command.
 
+use crate::plugin::loader::PluginStatus;
+use crate::state::AppState;
+use std::sync::{Arc, Mutex};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+
 /// Prefix applied to every plugin WebView label so plugin windows are
 /// distinguishable from the app's fixed windows (main/settings/etc.).
 pub const LABEL_PREFIX: &str = "plugin-";
@@ -53,6 +58,83 @@ pub const ANI_SDK_JS: &str = r#"
   });
 })();
 "#;
+
+/// Spawn (or re-focus) the WebView for plugin `id`.
+///
+/// Idempotent: if the window already exists it is shown and focused.
+/// Otherwise it is built from `plugin://<id>/<entry>`, sized from the
+/// manifest, with `ANI_SDK_JS` injected. The live label is recorded on
+/// the `PluginRecord` and cleared on window destroy.
+pub fn launch_plugin_webview(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    let label = webview_label_for_id(id);
+
+    if let Some(win) = app.get_webview_window(&label) {
+        let _ = win.show();
+        let _ = win.set_focus();
+        return Ok(());
+    }
+
+    // Read entry + window config from state, then release the lock.
+    let (entry, wcfg) = {
+        let state = app.state::<Arc<Mutex<AppState>>>();
+        let guard = state.lock().map_err(|_| "state lock poisoned")?;
+        let rec = guard
+            .plugins
+            .get(id)
+            .ok_or_else(|| format!("plugin '{}' not installed", id))?;
+        if !rec.enabled {
+            return Err("plugin not enabled".into());
+        }
+        if let PluginStatus::Error(reason) = &rec.status {
+            return Err(format!("plugin in error state: {}", reason));
+        }
+        (rec.manifest.entry.clone(), rec.manifest.window.clone())
+    };
+
+    let url = format!("plugin://{}/{}", id, entry);
+    let parsed: tauri::Url = url
+        .parse()
+        .map_err(|e| format!("invalid plugin url '{}': {}", url, e))?;
+
+    let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::CustomProtocol(parsed))
+        .title(&label)
+        .inner_size(wcfg.width as f64, wcfg.height as f64)
+        .resizable(wcfg.resizable)
+        .always_on_top(wcfg.always_on_top)
+        .decorations(wcfg.decorations)
+        .transparent(wcfg.transparent)
+        .visible(true)
+        .initialization_script(ANI_SDK_JS)
+        .build()
+        .map_err(|e| format!("failed to build plugin window: {}", e))?;
+
+    {
+        let state = app.state::<Arc<Mutex<AppState>>>();
+        let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+        if let Some(rec) = guard.plugins.get_mut(id) {
+            rec.webview_label = Some(label.clone());
+        }
+    }
+
+    // Clear the recorded label when the window is destroyed so a later
+    // launch rebuilds it instead of trying to reuse a dead label.
+    let app_for_event = app.clone();
+    let id_for_event = id.to_string();
+    win.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            if let Some(state) = app_for_event.try_state::<Arc<Mutex<AppState>>>() {
+                if let Ok(mut guard) = state.lock() {
+                    if let Some(rec) = guard.plugins.get_mut(&id_for_event) {
+                        rec.webview_label = None;
+                    }
+                }
+            }
+        }
+    });
+
+    crate::app_log!("[plugin] launched webview for {}", id);
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
