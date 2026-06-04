@@ -19,6 +19,7 @@ import { useOpacity, OPACITY_MIN, OPACITY_MAX } from "../hooks/useOpacity";
 import { effects, useEffectEnabled } from "../effects";
 import { useCustomMimes, ALL_STATUSES } from "../hooks/useCustomMimes";
 import { SmartImport } from "./SmartImport";
+import { PluginManager } from "./PluginManager";
 import { AnimationPreview } from "./AnimationPreview";
 import type { Status } from "../types/status";
 import { readFile } from "@tauri-apps/plugin-fs";
@@ -71,13 +72,14 @@ function parseFrameSpec(spec: string): number {
 
 export { parseFrameSpec };
 
-type Tab = "general" | "mime" | "sound" | "claude" | "about";
+type Tab = "general" | "mime" | "sound" | "claude" | "plugins" | "about";
 
 const tabTitles: Record<Tab, string> = {
   general: "General",
   mime: "Mime",
   sound: "Sound",
   claude: "Claude Code",
+  plugins: "Plugins",
   about: "About",
 };
 
@@ -391,7 +393,7 @@ export function Settings() {
   return (
     <div className="settings">
       <nav className="settings-sidebar">
-        {(["general", "mime", "sound", "claude", "about"] as Tab[]).map((t) => (
+        {(["general", "mime", "sound", "claude", "plugins", "about"] as Tab[]).map((t) => (
           <button
             key={t}
             className={`sidebar-item ${tab === t ? "active" : ""}`}
@@ -1470,6 +1472,11 @@ export function Settings() {
               </>
             )}
           </>
+        )}
+        {tab === "plugins" && (
+          <div className="settings-section" data-testid="settings-tab-plugins">
+            <PluginManager />
+          </div>
         )}
         {tab === "about" && (
           <div className="settings-section">
