@@ -3,6 +3,27 @@ import { usePlugins } from "../hooks/usePlugins";
 import type { PluginRecord } from "../types/plugin";
 import "../styles/plugin-manager.css";
 
+const IS_MAC =
+  typeof navigator !== "undefined" &&
+  /mac/i.test(navigator.platform || navigator.userAgent || "");
+
+const MAC_GLYPHS: Record<string, string> = {
+  cmdorctrl: "⌘", cmd: "⌘", command: "⌘", super: "⌘", meta: "⌘",
+  ctrl: "⌃", control: "⌃", shift: "⇧", alt: "⌥", option: "⌥",
+};
+const PC_LABELS: Record<string, string> = {
+  cmdorctrl: "Ctrl", cmd: "Win", command: "Win", super: "Win", meta: "Win",
+  ctrl: "Ctrl", control: "Ctrl", shift: "Shift", alt: "Alt", option: "Alt",
+};
+
+/** "CmdOrCtrl+Shift+V" → "⌘⇧V" (mac) or "Ctrl+Shift+V" (other). */
+function formatHotkey(accelerator: string): string {
+  const map = IS_MAC ? MAC_GLYPHS : PC_LABELS;
+  const parts = accelerator.split("+").map((p) => p.trim()).filter(Boolean);
+  const out = parts.map((p) => map[p.toLowerCase()] ?? p.toUpperCase());
+  return out.join(IS_MAC ? "" : "+");
+}
+
 export function PluginManager() {
   const { plugins, loading, error, install, uninstall, setEnabled, launch } = usePlugins();
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -129,23 +150,36 @@ function PluginCard({
       )}
 
       <div className="plugin-card-foot">
-        <button
-          type="button"
-          className="settings-action-btn"
-          data-testid={`plugin-launch-btn-${manifest.id}`}
-          disabled={!enabled || isError}
-          onClick={onLaunch}
-        >
-          Launch
-        </button>
-        <button
-          type="button"
-          className={`settings-action-btn ${confirming ? "plugin-uninstall-confirming" : ""}`}
-          data-testid={`plugin-uninstall-btn-${manifest.id}`}
-          onClick={onUninstall}
-        >
-          {confirming ? "Confirm?" : "Uninstall"}
-        </button>
+        {manifest.hotkey ? (
+          <kbd
+            className="plugin-hotkey"
+            data-testid={`plugin-hotkey-${manifest.id}`}
+            title={`Press ${manifest.hotkey} to open ${manifest.name}`}
+          >
+            {formatHotkey(manifest.hotkey)}
+          </kbd>
+        ) : (
+          <span className="plugin-hotkey-spacer" />
+        )}
+        <div className="plugin-foot-actions">
+          <button
+            type="button"
+            className="settings-action-btn"
+            data-testid={`plugin-launch-btn-${manifest.id}`}
+            disabled={!enabled || isError}
+            onClick={onLaunch}
+          >
+            Launch
+          </button>
+          <button
+            type="button"
+            className={`settings-action-btn ${confirming ? "plugin-uninstall-confirming" : ""}`}
+            data-testid={`plugin-uninstall-btn-${manifest.id}`}
+            onClick={onUninstall}
+          >
+            {confirming ? "Confirm?" : "Uninstall"}
+          </button>
+        </div>
       </div>
     </div>
   );

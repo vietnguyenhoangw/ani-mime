@@ -31,6 +31,19 @@ describe("PluginManager", () => {
     expect(screen.getByTestId("plugin-card-screenshot")).toBeInTheDocument();
   });
 
+  it("shows a hotkey badge only when the manifest declares one", async () => {
+    const withKey = rec("translator");
+    withKey.manifest.hotkey = "CmdOrCtrl+Shift+V";
+    mockInvoke("get_plugins", [withKey, rec("screenshot")]);
+    render(<PluginManager />);
+
+    const badge = await screen.findByTestId("plugin-hotkey-translator");
+    expect(badge).toBeInTheDocument();
+    expect(badge.textContent).toMatch(/V/);
+    // The plugin without a hotkey shows no badge.
+    expect(screen.queryByTestId("plugin-hotkey-screenshot")).toBeNull();
+  });
+
   it("shows an error badge with the reason for a broken plugin", async () => {
     mockInvoke("get_plugins", [rec("broken", { status: { type: "Error", reason: "bad manifest" } })]);
     render(<PluginManager />);

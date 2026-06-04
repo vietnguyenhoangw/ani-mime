@@ -448,6 +448,7 @@ fn install_plugin_from_dialog(app: tauri::AppHandle) -> Result<plugin::PluginRec
     }
     let _ = app.emit("plugins-changed", ());
     crate::app_log!("[plugin] installed {} v{}", manifest.id, manifest.version);
+    plugin::hotkey::register_record(&app, &record);
     Ok(record)
 }
 
@@ -461,12 +462,21 @@ fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
         let _ = win.close();
     }
 
+    let state = app.state::<Arc<Mutex<AppState>>>();
+    // Capture the hotkey before we drop the record so we can unregister it.
+    let hotkey = state
+        .lock()
+        .ok()
+        .and_then(|g| g.plugins.get(&id).and_then(plugin::hotkey::manifest_hotkey));
+
     plugin::loader::uninstall_plugin(&id, &root).map_err(|e| e.to_string())?;
 
-    let state = app.state::<Arc<Mutex<AppState>>>();
     {
         let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
         guard.plugins.remove(&id);
+    }
+    if let Some(hk) = hotkey {
+        plugin::hotkey::unregister(&app, &hk);
     }
     let _ = app.emit("plugins-changed", ());
     crate::app_log!("[plugin] uninstalled {}", id);
@@ -480,15 +490,27 @@ fn set_ani_plugin_enabled(
     enabled: bool,
 ) -> Result<(), String> {
     let state = app.state::<Arc<Mutex<AppState>>>();
-    {
+    let hotkey = {
         let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
         match guard.plugins.get_mut(&id) {
-            Some(rec) => rec.enabled = enabled,
+            Some(rec) => {
+                rec.enabled = enabled;
+                plugin::hotkey::manifest_hotkey(rec)
+            }
             None => return Err(format!("plugin '{}' not installed", id)),
         }
-    }
-    // Disabling closes any open window (enabling is lazy — launch on demand).
-    if !enabled {
+    };
+    if enabled {
+        // Register the launch hotkey (no-op if the plugin declares none).
+        if let Some(hk) = &hotkey {
+            plugin::hotkey::register(&app, &id, hk);
+        }
+    } else {
+        // Disabling unregisters the hotkey and closes any open window
+        // (enabling is otherwise lazy — launch on demand).
+        if let Some(hk) = &hotkey {
+            plugin::hotkey::unregister(&app, hk);
+        }
         let label = plugin::runtime::webview_label_for_id(&id);
         if let Some(win) = app.get_webview_window(&label) {
             let _ = win.close();
@@ -550,6 +572,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins, launch_plugin, plugin::gateway::plugin_call])
         .setup(|app| {
@@ -738,6 +761,9 @@ pub fn run() {
                         guard.plugins = records;
                     }
                     crate::app_log!("[plugin] startup scan: {} installed", count);
+                    if let Ok(guard) = app_state.lock() {
+                        plugin::hotkey::register_enabled(app.handle(), &guard.plugins);
+                    }
                     let _ = app.emit("plugins-changed", ());
                 }
                 Err(e) => {

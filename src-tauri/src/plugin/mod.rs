@@ -8,6 +8,7 @@
 
 pub mod clipboard;
 pub mod gateway;
+pub mod hotkey;
 pub mod loader;
 pub mod manifest;
 pub mod protocol;

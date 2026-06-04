@@ -85,16 +85,43 @@
   font-size: 13px;
 }
 
-/* Footer: actions right-aligned, with a full-bleed hairline divider.
-   Negative margins stretch the divider to the card edges and cancel the
-   card's bottom padding; the footer then re-pads its own buttons. */
+/* Footer: hotkey badge on the left, actions on the right, with a full-bleed
+   hairline divider. Negative margins stretch the divider to the card edges
+   and cancel the card's bottom padding; the footer re-pads its own content. */
 .plugin-card-foot {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   margin: 4px -12px -12px;
   padding: 10px 12px;
   border-top: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+.plugin-foot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.plugin-hotkey-spacer {
+  flex: 1;
+}
+
+/* Keyboard-shortcut badge (e.g. ⌘⇧V) shown at the footer's left. */
+.plugin-hotkey {
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(128, 128, 128, 0.16);
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  color: inherit;
+  white-space: nowrap;
+}
+
+.plugin-card.is-disabled .plugin-hotkey {
+  opacity: 0.5;
 }
 
 /* Uninstall reuses .settings-action-btn; turns red while awaiting confirm. */
