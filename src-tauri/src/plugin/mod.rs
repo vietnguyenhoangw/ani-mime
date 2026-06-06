@@ -14,6 +14,7 @@ pub mod manifest;
 pub mod protocol;
 pub mod runtime;
 pub mod storage;
+pub mod translate;
 
 pub use loader::PluginRecord;
 pub use manifest::Manifest;
