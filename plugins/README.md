@@ -24,6 +24,7 @@ plugins/
 | Plugin | What it does |
 |--------|--------------|
 | [`clipboard`](./clipboard) | System clipboard history — your last 20 copies, ready to paste back |
+| [`translate`](./translate) | Quick text translation — type, Enter, get the result, or open it in Google Translate |
 
 ## Authoring a plugin
 
