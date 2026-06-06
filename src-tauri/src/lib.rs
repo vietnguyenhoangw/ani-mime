@@ -414,7 +414,12 @@ fn start_visit(
 
 // --- Plugin system (Slice 1) ---
 
-#[tauri::command]
+// `(async)` runs this command on a worker thread instead of the main thread.
+// The native file panel (`pick_file`) is driven by the main-thread event loop;
+// if this command ran on the main thread, blocking on `rx.recv()` below would
+// deadlock the whole UI (the panel could never run, so the callback could never
+// fire). Off the main thread, the main loop is free to present the panel.
+#[tauri::command(async)]
 fn install_plugin_from_dialog(app: tauri::AppHandle) -> Result<plugin::PluginRecord, String> {
     use tauri_plugin_dialog::DialogExt;
 
