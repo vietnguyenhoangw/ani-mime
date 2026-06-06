@@ -126,6 +126,24 @@ pub fn plugin_call(
                 other => Err(format!("unknown clipboard method '{}'", other)),
             }
         }
+        "translate" => {
+            let q = arg_str(&args, "q")?;
+            let source = arg_str(&args, "source")?;
+            let target = arg_str(&args, "target")?;
+            match method.as_str() {
+                "text" => {
+                    let result =
+                        crate::plugin::translate::translate(&q, &source, &target)?;
+                    serde_json::to_value(result).map_err(|e| e.to_string())
+                }
+                "openWeb" => {
+                    let url = crate::plugin::translate::web_url(&q, &source, &target);
+                    crate::platform::open_url(&url);
+                    Ok(serde_json::Value::Null)
+                }
+                other => Err(format!("unknown translate method '{}'", other)),
+            }
+        }
         other => Err(format!("unknown capability '{}'", other)),
     }
 }
