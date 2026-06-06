@@ -16,8 +16,8 @@ pub struct TranslateResult {
 pub fn api_url(q: &str, source: &str, target: &str) -> String {
     format!(
         "https://translate.googleapis.com/translate_a/single?client=gtx&sl={}&tl={}&dt=t&q={}",
-        source,
-        target,
+        urlencoding::encode(source),
+        urlencoding::encode(target),
         urlencoding::encode(q)
     )
 }
@@ -26,8 +26,8 @@ pub fn api_url(q: &str, source: &str, target: &str) -> String {
 pub fn web_url(q: &str, source: &str, target: &str) -> String {
     format!(
         "https://translate.google.com/?sl={}&tl={}&text={}&op=translate",
-        source,
-        target,
+        urlencoding::encode(source),
+        urlencoding::encode(target),
         urlencoding::encode(q)
     )
 }
@@ -130,5 +130,10 @@ mod tests {
     fn parse_response_rejects_empty_text() {
         let json = serde_json::json!([[], null, "en"]);
         assert!(parse_response(&json).is_err());
+    }
+
+    #[test]
+    fn parse_response_rejects_null_root() {
+        assert!(parse_response(&serde_json::Value::Null).is_err());
     }
 }
