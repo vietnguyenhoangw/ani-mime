@@ -62,8 +62,15 @@ pub fn parse_response(json: &serde_json::Value) -> Result<TranslateResult, Strin
 /// Call the endpoint and parse the result. Non-2xx and network failures map
 /// to `Err`. The caller (gateway) surfaces the error to the UI.
 pub fn translate(q: &str, source: &str, target: &str) -> Result<TranslateResult, String> {
+    use std::time::Duration;
     let url = api_url(q, source, target);
-    let mut response = ureq::get(&url)
+    let agent = ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(10)))
+            .build(),
+    );
+    let mut response = agent
+        .get(&url)
         .header("User-Agent", "ani-mime-translate")
         .call()
         .map_err(|e| format!("translate request failed: {e}"))?;
