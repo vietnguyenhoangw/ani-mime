@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Capability strings allowed in v1. Any other entry in
 /// `Manifest.capabilities` rejects the manifest at validation time.
-pub const ALLOWED_CAPABILITIES: &[&str] = &["window", "hotkey", "storage", "clipboard"];
+pub const ALLOWED_CAPABILITIES: &[&str] = &["window", "hotkey", "storage", "clipboard", "translate"];
 
 pub const MAX_WINDOW_WIDTH: u32 = 1920;
 pub const MAX_WINDOW_HEIGHT: u32 = 1080;
@@ -401,5 +401,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let err = canonicalize_entry(tmp.path(), "does-not-exist.html").unwrap_err();
         assert!(matches!(err, ManifestError::EntryNotFound(_)));
+    }
+
+    #[test]
+    fn translate_is_an_allowed_capability() {
+        assert!(ALLOWED_CAPABILITIES.contains(&"translate"));
     }
 }
