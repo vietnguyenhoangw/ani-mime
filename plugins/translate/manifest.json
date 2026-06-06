@@ -1,0 +1,17 @@
+{
+  "id": "translate",
+  "name": "Quick Translate",
+  "version": "0.1.0",
+  "description": "Translate text fast — type, hit Enter, get the translation. Or open it in Google Translate.",
+  "author": "ani-mime",
+  "entry": "index.html",
+  "hotkey": "CmdOrCtrl+Shift+T",
+  "capabilities": ["window", "translate"],
+  "window": {
+    "width": 420,
+    "height": 520,
+    "resizable": true,
+    "alwaysOnTop": true,
+    "decorations": true
+  }
+}
