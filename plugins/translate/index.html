@@ -192,7 +192,12 @@
       window.ani.translate.openWeb(q, $("source").value, $("target").value);
     });
 
-    $("input").focus();
+    // Focus the input on load and every time the window regains focus, so
+    // re-launching via the hotkey (while another app was active) always drops
+    // the caret straight into the input, ready to type.
+    function focusInput() { $("input").focus(); }
+    focusInput();
+    window.addEventListener("focus", focusInput);
   </script>
 </body>
 </html>
