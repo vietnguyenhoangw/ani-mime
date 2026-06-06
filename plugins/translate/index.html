@@ -39,9 +39,22 @@
     .bar { display: flex; align-items: center; gap: 8px; }
     select {
       flex: 1; font: inherit; color: var(--text);
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 7px; padding: 6px 8px; cursor: pointer;
+      /* Drop the native macOS widget so the surface/border styling applies. */
+      -webkit-appearance: none; appearance: none;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 26px 6px 10px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+      text-overflow: ellipsis;
+      /* Custom chevron (matches the muted text tone). */
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23888888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
     }
+    select:hover { background-color: var(--surface-hover); }
+    select:focus { outline: none; border-color: var(--accent); }
     button {
       font: inherit; color: var(--text); background: var(--surface);
       border: 1px solid var(--border); border-radius: 7px;
