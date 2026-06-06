@@ -53,6 +53,10 @@ pub const ANI_SDK_JS: &str = r#"
       copy: function (text) { return invoke('clipboard', 'copy', { text: text }); },
       remove: function (text) { return invoke('clipboard', 'remove', { text: text }); },
       clear: function () { return invoke('clipboard', 'clear'); }
+    },
+    translate: {
+      text:    function (q, source, target) { return invoke('translate', 'text',    { q: q, source: source, target: target }); },
+      openWeb: function (q, source, target) { return invoke('translate', 'openWeb', { q: q, source: source, target: target }); }
     }
   };
 
@@ -191,5 +195,11 @@ mod tests {
         assert!(ANI_SDK_JS.contains("get:"));
         assert!(ANI_SDK_JS.contains("set:"));
         assert!(ANI_SDK_JS.contains("delete:"));
+    }
+
+    #[test]
+    fn sdk_script_exposes_translate_namespace() {
+        assert!(ANI_SDK_JS.contains("translate:"));
+        assert!(ANI_SDK_JS.contains("openWeb"));
     }
 }
