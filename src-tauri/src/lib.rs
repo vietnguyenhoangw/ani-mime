@@ -648,7 +648,23 @@ pub fn run() {
                 .item(&PredefinedMenuItem::quit(app, Some("Quit Ani-Mime"))?)
                 .build()?;
 
-            let menu = MenuBuilder::new(app).item(&app_menu).build()?;
+            // An Edit menu is required for the standard Cmd+C/V/X/A/Z shortcuts
+            // to reach text fields on macOS — without it, paste etc. silently do
+            // nothing in every window, including plugin webviews.
+            let edit_menu = SubmenuBuilder::new(app, "Edit")
+                .item(&PredefinedMenuItem::undo(app, Some("Undo"))?)
+                .item(&PredefinedMenuItem::redo(app, Some("Redo"))?)
+                .separator()
+                .item(&PredefinedMenuItem::cut(app, Some("Cut"))?)
+                .item(&PredefinedMenuItem::copy(app, Some("Copy"))?)
+                .item(&PredefinedMenuItem::paste(app, Some("Paste"))?)
+                .item(&PredefinedMenuItem::select_all(app, Some("Select All"))?)
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&app_menu)
+                .item(&edit_menu)
+                .build()?;
             app.set_menu(menu)?;
             crate::app_log!("[app] menu bar created");
 
