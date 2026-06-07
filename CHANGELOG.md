@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.13] - 2026-06-07
+
+### Added
+- **Quick Translate plugin.** Hotkey-launched popup (`Cmd/Ctrl+Shift+T`) that translates text inline (server-side via Google's free endpoint, no CORS) with quick language pickers, a swap button, and an **Open in Google Translate** button. Pre-fills from the text selected in the frontmost app at hotkey time (macOS; requires Accessibility permission).
+- **`translate` and `selection` plugin capabilities.** New gated `window.ani` APIs — `translate.text` / `translate.openWeb`, and `selection.read` (host-captured selection).
+- **Edit menu** (Undo/Redo/Cut/Copy/Paste/Select All) — enables the standard `Cmd+C/V/X/A/Z` shortcuts across all app windows.
+
+### Fixed
+- Installing a plugin from the file dialog no longer freezes the app (the command ran on the main thread and deadlocked on the picker callback).
+- Plugin hotkey reassignment now accepts Option (`⌥`) based shortcuts (resolved from the physical key code).
+
 ## [0.17.12] - 2026-06-04
 
 ### Added
