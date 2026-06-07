@@ -82,10 +82,12 @@ dependencies = [
 
 [[package]]
 name = "ani-mime"
-version = "0.17.12"
+version = "0.17.13"
 dependencies = [
  "arboard",
  "cocoa",
+ "core-foundation",
+ "core-graphics 0.24.0",
  "dirs 6.0.0",
  "gtk",
  "hostname",

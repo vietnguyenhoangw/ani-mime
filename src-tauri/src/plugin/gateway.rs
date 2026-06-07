@@ -126,6 +126,37 @@ pub fn plugin_call(
                 other => Err(format!("unknown clipboard method '{}'", other)),
             }
         }
+        "selection" => {
+            match method.as_str() {
+                // One-shot read: returns the text captured at hotkey-launch time
+                // and clears it so a later manual launch doesn't re-fill.
+                "read" => {
+                    let state = window.state::<Arc<Mutex<AppState>>>();
+                    let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+                    let text = guard.pending_selection.remove(&id).unwrap_or_default();
+                    Ok(serde_json::Value::String(text))
+                }
+                other => Err(format!("unknown selection method '{}'", other)),
+            }
+        }
+        "translate" => {
+            let q = arg_str(&args, "q")?;
+            let source = arg_str(&args, "source")?;
+            let target = arg_str(&args, "target")?;
+            match method.as_str() {
+                "text" => {
+                    let result =
+                        crate::plugin::translate::translate(&q, &source, &target)?;
+                    serde_json::to_value(result).map_err(|e| e.to_string())
+                }
+                "openWeb" => {
+                    let url = crate::plugin::translate::web_url(&q, &source, &target);
+                    crate::platform::open_url(&url);
+                    Ok(serde_json::Value::Null)
+                }
+                other => Err(format!("unknown translate method '{}'", other)),
+            }
+        }
         other => Err(format!("unknown capability '{}'", other)),
     }
 }

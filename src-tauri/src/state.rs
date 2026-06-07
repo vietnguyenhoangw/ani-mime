@@ -142,6 +142,10 @@ pub struct AppState {
     /// `plugin::clipboard` monitor while a `clipboard`-capable plugin is
     /// enabled. Exposed to plugins via the `clipboard` capability.
     pub clipboard_history: Vec<String>,
+    /// Text captured from the frontmost app's selection at hotkey-launch time,
+    /// keyed by plugin id. One-shot: the plugin reads it (and it is cleared)
+    /// via the `selection` capability. See `plugin::selection`.
+    pub pending_selection: HashMap<String, String>,
 }
 
 /// Deterministic hash of the session fields the UI renders. Pids are sorted so

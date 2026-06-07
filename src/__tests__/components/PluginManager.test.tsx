@@ -65,6 +65,27 @@ describe("PluginManager", () => {
     );
   });
 
+  it("records an Option-based shortcut via e.code (macOS rewrites e.key)", async () => {
+    const withKey = rec("translator");
+    withKey.manifest.hotkey = "CmdOrCtrl+Shift+V";
+    mockInvoke("get_plugins", [withKey]);
+    mockInvoke("set_plugin_hotkey", null);
+    render(<PluginManager />);
+
+    const badge = await screen.findByTestId("plugin-hotkey-translator");
+    fireEvent.click(badge);
+
+    // Option+T on macOS: the browser reports e.key as "†" but e.code stays "KeyT".
+    fireEvent.keyDown(window, { key: "†", code: "KeyT", altKey: true });
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("set_plugin_hotkey", {
+        id: "translator",
+        hotkey: "Alt+T",
+      })
+    );
+  });
+
   it("shows an error badge with the reason for a broken plugin", async () => {
     mockInvoke("get_plugins", [rec("broken", { status: { type: "Error", reason: "bad manifest" } })]);
     render(<PluginManager />);

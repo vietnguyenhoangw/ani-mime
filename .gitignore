@@ -34,3 +34,6 @@ test-results/
 .gitnexus
 
 .worktrees/
+
+# Visual companion brainstorm artifacts
+.superpowers/

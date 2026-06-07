@@ -414,7 +414,12 @@ fn start_visit(
 
 // --- Plugin system (Slice 1) ---
 
-#[tauri::command]
+// `(async)` runs this command on a worker thread instead of the main thread.
+// The native file panel (`pick_file`) is driven by the main-thread event loop;
+// if this command ran on the main thread, blocking on `rx.recv()` below would
+// deadlock the whole UI (the panel could never run, so the callback could never
+// fire). Off the main thread, the main loop is free to present the panel.
+#[tauri::command(async)]
 fn install_plugin_from_dialog(app: tauri::AppHandle) -> Result<plugin::PluginRecord, String> {
     use tauri_plugin_dialog::DialogExt;
 
@@ -643,7 +648,23 @@ pub fn run() {
                 .item(&PredefinedMenuItem::quit(app, Some("Quit Ani-Mime"))?)
                 .build()?;
 
-            let menu = MenuBuilder::new(app).item(&app_menu).build()?;
+            // An Edit menu is required for the standard Cmd+C/V/X/A/Z shortcuts
+            // to reach text fields on macOS — without it, paste etc. silently do
+            // nothing in every window, including plugin webviews.
+            let edit_menu = SubmenuBuilder::new(app, "Edit")
+                .item(&PredefinedMenuItem::undo(app, Some("Undo"))?)
+                .item(&PredefinedMenuItem::redo(app, Some("Redo"))?)
+                .separator()
+                .item(&PredefinedMenuItem::cut(app, Some("Cut"))?)
+                .item(&PredefinedMenuItem::copy(app, Some("Copy"))?)
+                .item(&PredefinedMenuItem::paste(app, Some("Paste"))?)
+                .item(&PredefinedMenuItem::select_all(app, Some("Select All"))?)
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&app_menu)
+                .item(&edit_menu)
+                .build()?;
             app.set_menu(menu)?;
             crate::app_log!("[app] menu bar created");
 
@@ -795,6 +816,7 @@ pub fn run() {
                 last_sessions_fingerprint: 0,
                 plugins: HashMap::new(),
                 clipboard_history: plugin::clipboard::load_history(),
+                pending_selection: HashMap::new(),
             }));
 
             app.manage(app_state.clone());
