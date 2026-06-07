@@ -1,7 +1,7 @@
 {
   "id": "translate",
   "name": "Quick Translate",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "description": "Translate text fast — type, hit Enter, get the translation. Or open it in Google Translate.",
   "author": "ani-mime",
   "entry": "index.html",
