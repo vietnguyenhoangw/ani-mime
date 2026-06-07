@@ -126,6 +126,19 @@ pub fn plugin_call(
                 other => Err(format!("unknown clipboard method '{}'", other)),
             }
         }
+        "selection" => {
+            match method.as_str() {
+                // One-shot read: returns the text captured at hotkey-launch time
+                // and clears it so a later manual launch doesn't re-fill.
+                "read" => {
+                    let state = window.state::<Arc<Mutex<AppState>>>();
+                    let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
+                    let text = guard.pending_selection.remove(&id).unwrap_or_default();
+                    Ok(serde_json::Value::String(text))
+                }
+                other => Err(format!("unknown selection method '{}'", other)),
+            }
+        }
         "translate" => {
             let q = arg_str(&args, "q")?;
             let source = arg_str(&args, "source")?;

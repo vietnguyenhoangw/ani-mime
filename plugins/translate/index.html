@@ -205,12 +205,25 @@
       window.ani.translate.openWeb(q, $("source").value, $("target").value);
     });
 
-    // Focus the input on load and every time the window regains focus, so
-    // re-launching via the hotkey (while another app was active) always drops
-    // the caret straight into the input, ready to type.
-    function focusInput() { $("input").focus(); }
-    focusInput();
-    window.addEventListener("focus", focusInput);
+    // On launch, pull in any text the host grabbed from the previously-active
+    // app's selection (captured at hotkey time) and translate it immediately.
+    // If there's nothing, just focus the input.
+    async function loadSelection() {
+      try {
+        const s = await window.ani.selection.read();
+        if (s && s.trim()) {
+          $("input").value = s;
+          doTranslate();
+          return;
+        }
+      } catch (e) { /* no selection / capability — fall through to focus */ }
+      $("input").focus();
+    }
+    loadSelection();
+
+    // Re-focus the input whenever the window regains focus (e.g. you click the
+    // floating popup), so the caret is ready without an extra click.
+    window.addEventListener("focus", () => $("input").focus());
   </script>
 </body>
 </html>

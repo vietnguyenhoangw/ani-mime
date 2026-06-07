@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 
 /// Capability strings allowed in v1. Any other entry in
 /// `Manifest.capabilities` rejects the manifest at validation time.
-pub const ALLOWED_CAPABILITIES: &[&str] = &["window", "hotkey", "storage", "clipboard", "translate"];
+pub const ALLOWED_CAPABILITIES: &[&str] =
+    &["window", "hotkey", "storage", "clipboard", "translate", "selection"];
 
 pub const MAX_WINDOW_WIDTH: u32 = 1920;
 pub const MAX_WINDOW_HEIGHT: u32 = 1080;
@@ -406,5 +407,10 @@ mod tests {
     #[test]
     fn translate_is_an_allowed_capability() {
         assert!(ALLOWED_CAPABILITIES.contains(&"translate"));
+    }
+
+    #[test]
+    fn selection_is_an_allowed_capability() {
+        assert!(ALLOWED_CAPABILITIES.contains(&"selection"));
     }
 }

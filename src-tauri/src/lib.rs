@@ -800,6 +800,7 @@ pub fn run() {
                 last_sessions_fingerprint: 0,
                 plugins: HashMap::new(),
                 clipboard_history: plugin::clipboard::load_history(),
+                pending_selection: HashMap::new(),
             }));
 
             app.manage(app_state.clone());

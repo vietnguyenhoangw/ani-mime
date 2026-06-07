@@ -20,12 +20,47 @@ pub fn try_register(app: &tauri::AppHandle, id: &str, accelerator: &str) -> Resu
     app.global_shortcut()
         .on_shortcut(accelerator, move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
+                // Capture the frontmost app's selection BEFORE our window
+                // appears, while the source app is still focused.
+                maybe_capture_selection(&app_cb, &id_owned);
                 if let Err(e) = crate::plugin::runtime::launch_plugin_webview(&app_cb, &id_owned) {
                     crate::app_warn!("[hotkey] launch {} failed: {}", id_owned, e);
                 }
             }
         })
         .map_err(|e| e.to_string())
+}
+
+/// If plugin `id` is enabled and declares the `selection` capability, grab the
+/// frontmost app's current selection and stash it in `AppState.pending_selection`
+/// for the plugin to read on load. Best-effort: any failure leaves no entry, so
+/// the plugin simply opens empty.
+fn maybe_capture_selection(app: &tauri::AppHandle, id: &str) {
+    use crate::state::AppState;
+    use std::sync::{Arc, Mutex};
+    use tauri::Manager;
+
+    // Own the Arc (clone out of the State wrapper) so the lock guard's
+    // lifetime isn't tied to a borrow that drops at the block boundary.
+    let state: Arc<Mutex<AppState>> = app.state::<Arc<Mutex<AppState>>>().inner().clone();
+
+    let declares_selection = match state.lock() {
+        Ok(guard) => guard
+            .plugins
+            .get(id)
+            .map(|r| r.enabled && r.manifest.capabilities.iter().any(|c| c == "selection"))
+            .unwrap_or(false),
+        Err(_) => false,
+    };
+    if !declares_selection {
+        return;
+    }
+
+    if let Some(text) = crate::plugin::selection::capture_selection() {
+        if let Ok(mut guard) = state.lock() {
+            guard.pending_selection.insert(id.to_string(), text);
+        }
+    }
 }
 
 /// Register `accelerator` to launch plugin `id`. Failures are logged, not
