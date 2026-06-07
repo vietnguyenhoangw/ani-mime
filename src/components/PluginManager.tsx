@@ -32,8 +32,28 @@ const NAMED_KEYS: Record<string, string> = {
   "-": "Minus", "=": "Equal", "`": "Backquote",
 };
 
-/** The non-modifier key of a keydown, as a Tauri accelerator token, or null. */
+/** Same tokens, keyed by physical `KeyboardEvent.code` (unaffected by Option). */
+const CODE_NAMED_KEYS: Record<string, string> = {
+  Space: "Space", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+  Enter: "Enter", Tab: "Tab", Backspace: "Backspace", Delete: "Delete",
+  Comma: "Comma", Period: "Period", Slash: "Slash", Semicolon: "Semicolon", Quote: "Quote",
+  BracketLeft: "BracketLeft", BracketRight: "BracketRight", Backslash: "Backslash",
+  Minus: "Minus", Equal: "Equal", Backquote: "Backquote",
+};
+
+/** The non-modifier key of a keydown, as a Tauri accelerator token, or null.
+ *  Resolves from the physical `e.code` first: on macOS, holding Option rewrites
+ *  `e.key` to a special character (⌥T → "†", ⌥E → "Dead"), which would otherwise
+ *  make Option-based shortcuts impossible to assign. Falls back to `e.key` for
+ *  environments/tests that don't populate `e.code`. */
 function mainKeyToken(e: KeyboardEvent): string | null {
+  const code = e.code;
+  let m: RegExpExecArray | null;
+  if ((m = /^Key([A-Z])$/.exec(code))) return m[1];
+  if ((m = /^Digit([0-9])$/.exec(code))) return m[1];
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code;
+  if (CODE_NAMED_KEYS[code]) return CODE_NAMED_KEYS[code];
+
   const k = e.key;
   if (/^[a-z]$/i.test(k)) return k.toUpperCase();
   if (/^[0-9]$/.test(k)) return k;
