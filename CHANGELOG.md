@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.17.14] - 2026-06-08
+
+### Fixed
+- Quick Translate no longer re-prompts for macOS Accessibility permission on every popup launch. It now asks at most once per app run — grant access, restart the app once, and selection pre-fill works silently thereafter.
+
 ## [0.17.13] - 2026-06-07
 
 ### Added

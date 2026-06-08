@@ -36,7 +36,13 @@ mod imp {
     use core_foundation::string::{CFString, CFStringRef};
     use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation, CGKeyCode};
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::Duration;
+
+    /// We prompt for Accessibility at most once per app run. A running process
+    /// can't see a freshly-granted permission until it is relaunched, so
+    /// re-prompting on every capture just nags the user with no upside.
+    static PROMPTED_THIS_SESSION: AtomicBool = AtomicBool::new(false);
 
     #[link(name = "ApplicationServices", kind = "framework")]
     extern "C" {
@@ -64,7 +70,10 @@ mod imp {
 
     pub fn capture_selection() -> Option<String> {
         if !accessibility_trusted() {
-            prompt_accessibility();
+            // Prompt only the first time this session; thereafter open empty.
+            if !PROMPTED_THIS_SESSION.swap(true, Ordering::Relaxed) {
+                prompt_accessibility();
+            }
             return None;
         }
 
