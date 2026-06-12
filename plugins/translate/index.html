@@ -32,9 +32,61 @@
       color: var(--text);
       font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       display: flex;
-      flex-direction: column;
-      padding: 12px;
-      gap: 10px;
+      flex-direction: row;
+    }
+
+    /* ---- History sidebar ---- */
+    .sidebar {
+      width: 240px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; flex-direction: column;
+      padding: 10px 8px; gap: 8px;
+      overflow: hidden;
+      transition: width 0.15s ease;
+    }
+    .sidebar.collapsed { width: 44px; padding: 10px 7px; }
+    .sb-head { display: flex; align-items: center; gap: 6px; }
+    .sb-title { font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; }
+    .sb-clear { font-size: 11px; padding: 3px 7px; color: var(--muted); }
+    .sb-toggle {
+      width: 28px; height: 28px; padding: 0; flex-shrink: 0; font-size: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .sidebar.collapsed .sb-title,
+    .sidebar.collapsed .sb-clear,
+    .sidebar.collapsed .sb-list { display: none; }
+    .sb-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; min-height: 0; }
+    .sb-empty { color: var(--muted); font-size: 12px; padding: 6px 4px; }
+    .sb-item {
+      position: relative; cursor: pointer;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 7px 9px; background: var(--bg);
+      display: flex; flex-direction: column; gap: 3px;
+      transition: background 0.12s;
+    }
+    .sb-item:hover { background: var(--surface-hover); }
+    .sb-raw, .sb-tr {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; word-break: break-word;
+    }
+    .sb-raw { color: var(--text); font-size: 12px; }
+    .sb-tr { color: var(--green); font-size: 11px; }
+    .sb-meta { color: var(--muted); font-size: 10px; }
+    .sb-del {
+      position: absolute; top: 4px; right: 4px;
+      width: 18px; height: 18px; padding: 0; border: none; background: transparent;
+      color: var(--muted); font-size: 14px; line-height: 1; opacity: 0;
+      display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;
+    }
+    .sb-item:hover .sb-del { opacity: 1; }
+    .sb-del:hover { background: var(--surface); color: var(--text); }
+
+    /* ---- Main column ---- */
+    main {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column;
+      padding: 12px; gap: 10px;
     }
     .bar { display: flex; align-items: center; gap: 8px; }
     select {
@@ -76,8 +128,29 @@
     }
     #result.placeholder, #result.error { color: var(--muted); }
     #result.error { color: var(--accent); }
-    .actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .actions { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
     .actions .grow { margin-right: auto; color: var(--muted); align-self: center; font-size: 11px; }
+    #help {
+      margin-right: auto;            /* push help to the left; Copy/Open stay right */
+      width: 24px; height: 24px; padding: 0;
+      border-radius: 50%; font-size: 12px; line-height: 1; color: var(--muted);
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .hint {
+      position: fixed; z-index: 10;
+      display: flex; flex-direction: column; gap: 6px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 11px; font-size: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+    .hint[hidden] { display: none; }
+    .hint-row { display: flex; align-items: center; gap: 8px; }
+    .hint kbd {
+      font: inherit; white-space: nowrap; color: var(--text);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 5px; padding: 1px 6px;
+    }
+    .hint-row span { color: var(--muted); }
     .primary { background: var(--accent); color: #fff; border-color: transparent; }
     .go { background: var(--green); color: #fff; border-color: transparent; }
     .toast {
@@ -90,25 +163,43 @@
   </style>
 </head>
 <body>
-  <div class="bar">
-    <select id="source" data-testid="tw-source" aria-label="Source language"></select>
-    <button id="swap" data-testid="tw-swap" aria-label="Swap languages" title="Swap languages">⇄</button>
-    <select id="target" data-testid="tw-target" aria-label="Target language"></select>
-  </div>
-
-  <div class="pane">
-    <textarea id="input" data-testid="tw-input" placeholder="Type text, then press Enter to translate…"></textarea>
-    <div class="actions">
-      <button id="translate" class="primary" data-testid="tw-translate-btn">Translate ⏎</button>
+  <aside id="sidebar" class="sidebar" data-testid="tw-sidebar">
+    <div class="sb-head">
+      <button id="sb-toggle" class="sb-toggle" data-testid="tw-history-toggle" aria-label="Toggle history (Cmd/Ctrl+L)" title="Toggle history (⌘L)">☰</button>
+      <span class="sb-title">History</span>
+      <button id="sb-clear" class="sb-clear" data-testid="tw-history-clear" title="Clear all history">Clear</button>
     </div>
-  </div>
+    <div id="sb-list" class="sb-list" data-testid="tw-history-list"></div>
+  </aside>
 
-  <div class="pane">
-    <div id="result" class="placeholder" data-testid="tw-result">Translation appears here.</div>
-    <div class="actions">
-      <button id="copy" data-testid="tw-copy-btn">Copy</button>
-      <button id="open" class="go" data-testid="tw-open-google-btn">Open in Google ↗</button>
+  <main>
+    <div class="bar">
+      <select id="source" data-testid="tw-source" aria-label="Source language"></select>
+      <button id="swap" data-testid="tw-swap" aria-label="Swap languages (Cmd/Ctrl+Shift+S)" title="Swap languages (⌘⇧S)">⇄</button>
+      <select id="target" data-testid="tw-target" aria-label="Target language"></select>
     </div>
+
+    <div class="pane">
+      <textarea id="input" data-testid="tw-input" placeholder="Type text, then press Enter or Translate…"></textarea>
+      <div class="actions">
+        <button id="translate" class="primary" data-testid="tw-translate-btn">Translate ⏎</button>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div id="result" class="placeholder" data-testid="tw-result">Translation appears here.</div>
+      <div class="actions">
+        <button id="help" data-testid="tw-help-btn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">?</button>
+        <button id="copy" data-testid="tw-copy-btn" aria-label="Copy translation (Cmd/Ctrl+Shift+C)" title="Copy translation (⌘⇧C)">Copy</button>
+        <button id="open" class="go" data-testid="tw-open-google-btn">Open in Google ↗</button>
+      </div>
+    </div>
+  </main>
+
+  <div class="hint" id="hint" data-testid="tw-hint" hidden>
+    <div class="hint-row"><kbd>⌘⇧S</kbd><span>Switch input/output languages</span></div>
+    <div class="hint-row"><kbd>⌘⇧C</kbd><span>Copy the translation</span></div>
+    <div class="hint-row"><kbd>⌘L</kbd><span>Toggle the history sidebar</span></div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -155,55 +246,266 @@
       el.className = cls || "";
     }
 
+    // ---- Translation -------------------------------------------------------
+
+    let lastKey = null;   // langs+text of the last translation: dedup + "is a result showing?"
+    let reqSeq = 0;       // guards an older response from overwriting a newer one
+
+    // Translate the current input. Skips when the exact same text+languages is
+    // already translated or in flight, so pressing Translate / Enter on an
+    // unchanged result makes no duplicate request (it's a no-op). A failed
+    // attempt resets lastKey below, so an explicit retry still goes through.
     async function doTranslate() {
       const q = $("input").value.trim();
-      if (!q) { setResult("Translation appears here.", "placeholder"); return; }
+      if (!q) { setResult("Translation appears here.", "placeholder"); lastKey = null; return; }
       const source = $("source").value;
       const target = $("target").value;
+      const key = source + "|" + target + "|" + q;
+      if (key === lastKey) return;   // already translated / in flight — no duplicate
+      lastKey = key;
+      const seq = ++reqSeq;
       setResult("Translating…", "placeholder");
       try {
         const res = await window.ani.translate.text(q, source, target);
+        if (seq !== reqSeq) return;            // superseded by a newer request
         setResult(res.text, "");
+        saveHistory(source, target, q, res.text);
       } catch (e) {
+        if (seq !== reqSeq) return;
+        lastKey = null;                        // allow the same text to be retried
         setResult("Translation failed — try again, or open in Google ↗.", "error");
       }
     }
 
-    // Enter translates; Shift+Enter inserts a newline.
+    // Manual mode: typing does NOT auto-translate — press Enter or the Translate
+    // button. (Selection-launched text still auto-translates once on open.)
+    // Shift+Enter inserts a newline.
     $("input").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         doTranslate();
       }
     });
-    $("translate").addEventListener("click", doTranslate);
+    $("translate").addEventListener("click", () => doTranslate());
 
-    $("swap").addEventListener("click", () => {
+    // Changing a language (or swapping) only refreshes an EXISTING translation;
+    // it won't translate text you haven't translated yet.
+    function retranslateIfActive() { if (lastKey !== null) doTranslate(); }
+    $("source").addEventListener("change", retranslateIfActive);
+    $("target").addEventListener("change", retranslateIfActive);
+
+    function doSwap() {
       const s = $("source").value;
       const t = $("target").value;
       // If source is "auto" there's nothing concrete to put on the target side.
       if (s === "auto") { toast("Pick a source language to swap"); return; }
       $("source").value = t;
       $("target").value = s;
-      doTranslate();
+      retranslateIfActive();
+    }
+    $("swap").addEventListener("click", doSwap);
+
+    // Plugin keyboard shortcuts:
+    //   Cmd/Ctrl+L       — toggle the history sidebar
+    //   Cmd/Ctrl+Shift+S — switch the input/output languages (mirrors the ⇄ button)
+    //   Cmd/Ctrl+Shift+C — copy the translated result (mirrors the Copy button)
+    window.addEventListener("keydown", (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.code === "KeyL" && !e.shiftKey) { e.preventDefault(); toggleSidebar(); return; }
+      if (!e.shiftKey) return;
+      if (e.code === "KeyS") { e.preventDefault(); doSwap(); }
+      else if (e.code === "KeyC") { e.preventDefault(); doCopy(); }
     });
 
-    $("copy").addEventListener("click", async () => {
+    async function doCopy() {
       const el = $("result");
-      if (el.classList.contains("placeholder") || el.classList.contains("error")) return;
+      if (el.classList.contains("placeholder") || el.classList.contains("error")) {
+        toast("Nothing to copy yet");
+        return;
+      }
       try {
         await navigator.clipboard.writeText(el.textContent);
         toast("Copied");
       } catch (e) {
         toast("Copy failed");
       }
-    });
+    }
+    $("copy").addEventListener("click", doCopy);
 
     $("open").addEventListener("click", () => {
       const q = $("input").value.trim();
       if (!q) { toast("Type something first"); return; }
       window.ani.translate.openWeb(q, $("source").value, $("target").value);
     });
+
+    // ---- History sidebar ---------------------------------------------------
+
+    const MAX_HISTORY = 25;
+    let history = [];               // [{ raw, translated, source, target, ts }], newest first
+    let sidebarOpen = false;        // default collapsed; persisted across launches
+
+    const LANG_LABEL = Object.fromEntries(LANGS);
+    function langTag(code) {
+      if (code === "auto") return "Auto";
+      return (LANG_LABEL[code] || code).toUpperCase().slice(0, 12);
+    }
+
+    // Persist to the disk-backed plugin store (survives app restarts) AND mirror
+    // to the webview's localStorage. The mirror is a safety net: if the disk
+    // store is unavailable (e.g. the app hasn't rescanned the manifest to grant
+    // the `storage` capability yet), history still survives a window close.
+    // loadVal prefers the disk store and falls back to localStorage.
+    async function loadVal(key) {
+      try {
+        const v = await window.ani.storage.get(key);
+        if (v !== null && v !== undefined) return v;
+      } catch (e) { /* capability off / first run */ }
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw != null) return JSON.parse(raw);
+      } catch (e) {}
+      return null;
+    }
+    function saveVal(key, val) {
+      try { window.ani.storage.set(key, val); } catch (e) {}
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+    }
+
+    function persistHistory() { saveVal("history", history); }
+
+    // Smart collapse: while the new text is a continuation of the most-recent
+    // entry (same languages, and one raw is a prefix of the other — i.e. you're
+    // still editing the same text), update that entry in place. Otherwise it's a
+    // genuinely different lookup, so prepend a new entry.
+    function saveHistory(source, target, raw, translated) {
+      const top = history[0];
+      const continuation = top && top.source === source && top.target === target &&
+        (raw.startsWith(top.raw) || top.raw.startsWith(raw));
+      const entry = { raw, translated, source, target, ts: Date.now() };
+      if (continuation) {
+        history[0] = entry;
+      } else {
+        history.unshift(entry);
+        if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+      }
+      persistHistory();
+      renderHistory();
+    }
+
+    // Clicking an entry restores the input, the result, and the language pair
+    // (programmatic select changes don't fire 'change', so this won't re-translate).
+    function restoreItem(item) {
+      if ([...$("source").options].some(o => o.value === item.source)) $("source").value = item.source;
+      if ([...$("target").options].some(o => o.value === item.target)) $("target").value = item.target;
+      $("input").value = item.raw;
+      setResult(item.translated, "");
+      lastKey = item.source + "|" + item.target + "|" + item.raw.trim();
+      $("input").focus();
+    }
+
+    function renderHistory() {
+      const list = $("sb-list");
+      list.textContent = "";
+      if (!history.length) {
+        const empty = document.createElement("div");
+        empty.className = "sb-empty";
+        empty.textContent = "No history yet.";
+        list.appendChild(empty);
+        return;
+      }
+      history.forEach((item, i) => {
+        const el = document.createElement("div");
+        el.className = "sb-item";
+        el.dataset.testid = "tw-history-item";
+        el.title = item.raw;
+
+        const raw = document.createElement("div");
+        raw.className = "sb-raw";
+        raw.textContent = item.raw;
+
+        const tr = document.createElement("div");
+        tr.className = "sb-tr";
+        tr.textContent = item.translated;
+
+        const meta = document.createElement("div");
+        meta.className = "sb-meta";
+        meta.textContent = langTag(item.source) + " → " + langTag(item.target);
+
+        const del = document.createElement("button");
+        del.className = "sb-del";
+        del.textContent = "×";
+        del.title = "Delete";
+        del.setAttribute("aria-label", "Delete history item");
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          history.splice(i, 1);
+          persistHistory();
+          renderHistory();
+        });
+
+        el.append(raw, tr, meta, del);
+        el.addEventListener("click", () => restoreItem(item));
+        list.appendChild(el);
+      });
+    }
+
+    function applySidebar() {
+      $("sidebar").classList.toggle("collapsed", !sidebarOpen);
+    }
+    function toggleSidebar() {
+      sidebarOpen = !sidebarOpen;
+      applySidebar();
+      saveVal("sidebarOpen", sidebarOpen);
+    }
+    $("sb-toggle").addEventListener("click", toggleSidebar);
+    $("sb-clear").addEventListener("click", () => {
+      if (!history.length) return;
+      history = [];
+      persistHistory();
+      renderHistory();
+      toast("History cleared");
+    });
+
+    async function initHistory() {
+      const h = await loadVal("history");
+      if (Array.isArray(h)) history = h;
+      const open = await loadVal("sidebarOpen");
+      if (typeof open === "boolean") sidebarOpen = open;
+      applySidebar();
+      renderHistory();
+    }
+    initHistory();
+
+    // ---- Shortcut hint popover --------------------------------------------
+
+    // "?" toggles a small keyboard-shortcut hint, anchored above the button so
+    // it follows the button regardless of the sidebar/layout width.
+    const hintEl = $("hint");
+    function openHint() {
+      const r = $("help").getBoundingClientRect();
+      hintEl.style.left = r.left + "px";
+      hintEl.style.bottom = (window.innerHeight - r.top + 6) + "px";
+      hintEl.hidden = false;
+    }
+    $("help").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (hintEl.hidden) openHint(); else hintEl.hidden = true;
+    });
+    document.addEventListener("click", (e) => {
+      if (!hintEl.hidden && !hintEl.contains(e.target) && e.target !== $("help")) {
+        hintEl.hidden = true;
+      }
+    });
+    // Capture phase so Escape closes the hint before the host's close-window handler.
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !hintEl.hidden) {
+        hintEl.hidden = true;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+
+    // ---- Launch ------------------------------------------------------------
 
     // On launch, pull in any text the host grabbed from the previously-active
     // app's selection (captured at hotkey time) and translate it immediately.
