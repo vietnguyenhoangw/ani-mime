@@ -34,7 +34,9 @@ body,
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
+  /* No right padding: the scroll body reaches the window's right edge so its
+     scrollbar sits flush against it (not floating with a 12px gap). */
+  padding: 0;
   background: var(--sl-surface);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   color: var(--text-primary);
@@ -45,6 +47,7 @@ body,
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 12px 12px 0 12px;
 }
 
 .session-list-header h1 {
@@ -59,13 +62,16 @@ body,
   color: var(--sl-muted);
 }
 
-/* List body fills the rest of the window and scrolls when long. */
+/* List body fills the rest of the window and scrolls when long. Reaches the
+   window's right edge (scrollbar flush right); content is padded on the left
+   and bottom, and the list items carry their own right padding. */
 .session-list-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  padding: 0 0 12px 12px;
   /* Thin, subtle overlay scrollbar instead of the chunky default. */
   scrollbar-width: thin;
   scrollbar-color: rgba(120, 120, 128, 0.4) transparent;
