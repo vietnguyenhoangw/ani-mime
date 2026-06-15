@@ -1,5 +1,7 @@
 import { Mascot } from "./components/Mascot";
 import { StatusPill } from "./components/StatusPill";
+import { MiniBar } from "./components/MiniBar";
+import { useMiniMode } from "./hooks/useMiniMode";
 import { SpeechBubble } from "./components/SpeechBubble";
 import { VisitorDog } from "./components/VisitorDog";
 import { DevTag } from "./components/DevTag";
@@ -67,10 +69,13 @@ function transitionToCaseId(prev: Status, next: Status): string | null {
 function App() {
   const { prompt, error: installError, clear } = useInstallPrompt();
   const { status, scenario } = useStatus();
-  const { dragging, onMouseDown } = useDrag();
   const { visible, message, dismiss } = useBubble();
   const visitors = useVisitors();
   const { scale } = useScale();
+  const mini = useMiniMode(scale);
+  // Pet mode: drag the pet anywhere. Mini mode: the container does NOT drag —
+  // the bar is edge-docked and moved only via the grip (mini.startEdgeDrag).
+  const { dragging, onMouseDown } = useDrag();
   const devMode = useDevMode();
   const devTagToggle = useDevTagVisible();
   const appBoundsToggle = useDevAppBounds();
@@ -183,7 +188,12 @@ function App() {
   // default and this hook re-fires to confirm.
   useWindowDefaultSize(
     scale,
-    effectActive || sessionOpen || sessionClosing || bubbleGrowActive || visitors.length > 0
+    mini.mode === "mini" ||
+      effectActive ||
+      sessionOpen ||
+      sessionClosing ||
+      bubbleGrowActive ||
+      visitors.length > 0
   );
 
   // Bubble orchestration: every source funnels through useBubble's
@@ -202,6 +212,7 @@ function App() {
     // grown window). Don't skip during sessionClosing — it's an
     // unreliable transient flag and using it here was making the bubble
     // grow effect exit early when it shouldn't.
+    if (mini.mode === "mini") return;
     if (sessionOpen) return;
     const win = getCurrentWindow();
     const def = getDefaultPetSize(scale);
@@ -259,7 +270,7 @@ function App() {
         console.error("[bubble-grow] close resize failed:", err);
       }
     })();
-  }, [bubbleGrowActive, sessionOpen, scale]);
+  }, [bubbleGrowActive, sessionOpen, scale, mini.mode]);
 
   // Visitor count change → drive the window size directly.
   //
@@ -281,6 +292,7 @@ function App() {
   // Grow to 500 wide for visitor mode, then restore to default on the
   // last visitor leaving.
   useEffect(() => {
+    if (mini.mode === "mini") return;
     const win = getCurrentWindow();
     const def = getDefaultPetSize(scale);
 
@@ -327,7 +339,7 @@ function App() {
         console.error("[visitors] restore failed:", err);
       }
     })();
-  }, [visitors.length, scale]);
+  }, [visitors.length, scale, mini.mode]);
 
   // When the dropdown opens the window grows wider (>= SESSION_DROPDOWN_MIN_WIDTH).
   // Because #root centers its content, a wider window visibly shifts the
@@ -342,6 +354,7 @@ function App() {
   // sequential awaits make one change visible before the other and the
   // pet flickers between positions.
   useEffect(() => {
+    if (mini.mode === "mini") return;
     const win = getCurrentWindow();
     const def = getDefaultPetSize(scale);
     const newWidth = Math.max(def.width, SESSION_DROPDOWN_MIN_WIDTH);
@@ -399,24 +412,39 @@ function App() {
         setSessionClosing(false);
       }
     })();
-  }, [sessionOpen, scale]);
+  }, [sessionOpen, scale, mini.mode]);
 
   return (
     <>
     <div
       ref={containerRef}
       data-testid="app-container"
-      className={`container ${dragging ? "dragging" : ""} ${scenario ? "scenario-active" : ""} ${visitors.length > 0 ? "has-visitors" : ""} ${devAppBounds ? "dev-bounds" : ""} ${devContainerBounds ? "dev-container-bounds" : ""}`}
+      className={`container ${mini.mode === "mini" ? "mini-mode" : ""} ${dragging ? "dragging" : ""} ${scenario ? "scenario-active" : ""} ${visitors.length > 0 ? "has-visitors" : ""} ${devAppBounds ? "dev-bounds" : ""} ${devContainerBounds ? "dev-container-bounds" : ""}`}
       style={{
         // Enforced inline (as well as via .has-visitors CSS rule) to
         // guarantee the highest specificity wins: whichever stylesheet
         // ordering or hot-reload state we're in, the min-width here
         // is authoritative.
-        minWidth: visitors.length > 0 ? "500px" : `${PET_BASE_WIDTH}px`,
-        minHeight: `${PET_BASE_HEIGHT}px`,
+        minWidth:
+          mini.mode === "mini"
+            ? undefined
+            : visitors.length > 0
+              ? "500px"
+              : `${PET_BASE_WIDTH}px`,
+        minHeight: mini.mode === "mini" ? undefined : `${PET_BASE_HEIGHT}px`,
       }}
-      onMouseDown={onMouseDown}
+      onMouseDown={mini.mode === "mini" ? undefined : onMouseDown}
     >
+      {mini.mode === "mini" ? (
+        <MiniBar
+          status={status}
+          orientation={mini.orientation}
+          edge={mini.edge}
+          onGripMouseDown={mini.startEdgeDrag}
+          onRestore={mini.exitMini}
+        />
+      ) : (
+        <>
       <div className="main-col">
         {scenario && <div data-testid="scenario-badge" className="scenario-badge">SCENARIO</div>}
         <EffectOverlay onActiveChange={setEffectActive} />
@@ -433,6 +461,7 @@ function App() {
           status={status}
           glow={visible}
           disabled={status === "visiting"}
+          onMinimize={mini.enterMini}
           onOpenChange={(open) => {
             // Flip sessionClosing to true in the SAME render batch that
             // sessionOpen becomes false — this keeps useWindowAutoSize
@@ -458,6 +487,8 @@ function App() {
             />
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
     <InstallPromptDialog prompt={prompt} error={installError} onDone={clear} />

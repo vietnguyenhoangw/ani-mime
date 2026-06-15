@@ -1,0 +1,84 @@
+/* Collapse the pet container's pet-size minimums while in mini mode, and make
+   it FILL the window. Without width/height:100% the bar collapses to its
+   content size and #root's centering leaves empty space between the pill and
+   the window edge — which read as the bar "not sticking" to the screen edge. */
+.container.mini-mode {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  /* The pet container uses cursor:grab (drag anywhere); in mini mode only
+     the grip moves the bar, so the bar/dot use the normal cursor. */
+  cursor: default;
+}
+
+.mini-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* gap + padding MUST match MINI_BAR geometry in utils/snap.ts so the
+     window (sized by useMiniMode) hugs the content with no dead space. */
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border-radius: 20px;
+  background: var(--bg-pill);
+  border: 1px solid var(--border-pill);
+  transition: box-shadow 0.3s, border-color 0.2s;
+}
+
+.mini-bar.vertical {
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+/* Mini-bar tool buttons reuse the status-pill button styling
+   (.pill-action-btn / .pill-action-icon, defined in status-pill.css)
+   so hover fill, press animation, icon opacity, and active/has-peers
+   highlights are identical to the pet-mode pill — but smaller, so the
+   docked bar stays compact (the pet pill keeps its 20px buttons). */
+.mini-bar .pill-action-btn {
+  width: 16px;
+  height: 16px;
+}
+
+/* Drag handle (6-dot grip). The ONLY element that moves the bar — see
+   useDrag({ requireHandle: true }). Pressing anywhere else does nothing. */
+.mini-bar-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Hug the glyph (no extra box width) so the grip's right edge sits the
+     same ~8px from the bar edge as the dot does on the left. Full bar
+     height keeps it grabbable despite the narrow width. */
+  width: auto;
+  height: 100%;
+  color: var(--text-primary);
+  /* Match the action icons (.pill-action-icon): 0.75 at rest, 1 on hover. */
+  opacity: 0.75;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: opacity 0.12s;
+}
+
+.mini-bar-grip:hover {
+  opacity: 1;
+}
+
+.mini-bar-grip:active {
+  cursor: grabbing;
+}
+
+/* Status glow — colors mirror the .dot.* values in status-pill.css. Kept
+   tight so the docked bar reads as crisp/solid rather than fuzzy. */
+.mini-bar.idle         { box-shadow: 0 0 5px rgba(52, 199, 89, 0.45); }
+.mini-bar.busy         { box-shadow: 0 0 5px rgba(255, 59, 48, 0.45); }
+.mini-bar.service      { box-shadow: 0 0 5px rgba(94, 92, 230, 0.45); }
+.mini-bar.searching    { box-shadow: 0 0 5px rgba(255, 204, 0, 0.45); }
+.mini-bar.initializing { box-shadow: 0 0 5px rgba(255, 159, 10, 0.45); }
+.mini-bar.visiting     { box-shadow: 0 0 5px rgba(175, 82, 222, 0.45); }
+.mini-bar.disconnected { box-shadow: 0 0 5px rgba(99, 99, 102, 0.35); }

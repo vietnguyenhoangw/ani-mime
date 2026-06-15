@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
   getCurrentWindow,
@@ -9,8 +8,16 @@ import {
 } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { Status } from "../types/status";
-import { fetchSessions, type SessionInfo } from "../hooks/useSessions";
+import { fetchSessions } from "../hooks/useSessions";
+import {
+  groupSessions,
+  detectHome,
+  reflectActiveServices,
+  overlayClaudeState,
+  type Group,
+} from "../utils/sessionGroups";
 import { useSessionList } from "../hooks/useSessionList";
+import { SessionDropdown } from "./SessionDropdown";
 import { useSessionGroupCount } from "../hooks/useSessionGroupCount";
 import { useLanList } from "../hooks/useLanList";
 import { useOpacity } from "../hooks/useOpacity";
@@ -35,6 +42,11 @@ interface StatusPillProps {
    * window while the fixed-positioned dropdown is visible.
    */
   onOpenChange?: (open: boolean) => void;
+  /**
+   * When provided, renders a minimize button that collapses the pet into
+   * mini-bar mode. Omitted in contexts where minimizing isn't allowed.
+   */
+  onMinimize?: () => void;
 }
 
 const dotClassMap: Record<Status, string> = {
@@ -56,150 +68,6 @@ const labelMap: Record<Status, string> = {
   searching: "Searching...",
   visiting: "Visiting...",
 };
-
-// Priority for picking a group's summary state: busy > service > idle.
-const statePriority: Record<string, number> = {
-  busy: 3,
-  service: 2,
-  idle: 1,
-};
-
-function groupState(sessions: SessionInfo[]): string {
-  let best = "idle";
-  let bestP = 0;
-  for (const s of sessions) {
-    const p = statePriority[s.ui_state] ?? 0;
-    if (p > bestP) {
-      bestP = p;
-      best = s.ui_state;
-    }
-  }
-  return best;
-}
-
-/** Turn /Users/you/dev/foo into ~/dev/foo when home is known. */
-function prettyPath(pwd: string, home?: string): string {
-  if (!pwd) return "";
-  if (home && pwd.startsWith(home)) return "~" + pwd.slice(home.length);
-  return pwd;
-}
-
-/** Last path segment of a group (the leaf folder name). Falls back to the
- *  pretty path or a sensible string when pwd is missing. */
-function groupBasename(g: { pwd: string; pretty: string; sessions: SessionInfo[] }): string {
-  if (g.pwd) {
-    const leaf = g.pwd.split("/").filter(Boolean).pop();
-    if (leaf) return leaf;
-  }
-  return g.pretty || g.sessions[0]?.title || "";
-}
-
-/** Human-readable label for what's happening in a single shell. */
-function shellLabel(s: SessionInfo): string {
-  if (s.has_claude) return "claude";
-  if (s.fg_cmd) {
-    return s.fg_cmd.replace(/^-/, "");
-  }
-  if (s.ui_state === "busy" && s.busy_type) return s.busy_type;
-  if (s.ui_state === "service") return "service";
-  return "idle";
-}
-
-interface Group {
-  key: string;
-  pwd: string;
-  pretty: string;
-  sessions: SessionInfo[];
-  state: string;
-  isClaudeFallback: boolean;
-}
-
-function groupSessions(sessions: SessionInfo[], home?: string): Group[] {
-  const claudeVirtual = sessions.find((s) => s.pid === 0);
-  const anyShellHasClaude = sessions.some((s) => s.pid !== 0 && s.has_claude);
-
-  const byKey = new Map<string, { pwd: string; list: SessionInfo[] }>();
-  for (const s of sessions) {
-    if (s.pid === 0) continue;
-    if (s.is_claude_proc) continue;
-    const key = s.pwd || s.title || String(s.pid);
-    if (!byKey.has(key)) byKey.set(key, { pwd: s.pwd, list: [] });
-    byKey.get(key)!.list.push(s);
-  }
-
-  const groups: Group[] = [];
-  for (const [key, { pwd, list }] of byKey.entries()) {
-    const pretty = pwd
-      ? prettyPath(pwd, home)
-      : list[0].title || `pid ${list[0].pid}`;
-    // Sort children within a group by pid so row order stays stable
-    // across refreshes. The backend returns sessions from a HashMap,
-    // so iteration order can change between invocations — without this
-    // sort, rows can swap under the cursor every 3s refresh and the
-    // CSS :hover highlight flickers off the row you're hovering.
-    list.sort((a, b) => a.pid - b.pid);
-    groups.push({
-      key,
-      pwd,
-      pretty,
-      sessions: list,
-      state: groupState(list),
-      isClaudeFallback: false,
-    });
-  }
-
-  groups.sort((a, b) => {
-    const pa = statePriority[a.state] ?? 0;
-    const pb = statePriority[b.state] ?? 0;
-    if (pa !== pb) return pb - pa;
-    return a.pretty.localeCompare(b.pretty);
-  });
-
-  if (claudeVirtual && !anyShellHasClaude) {
-    groups.push({
-      key: "claude-virtual",
-      pwd: "",
-      pretty: "Claude Code",
-      sessions: [claudeVirtual],
-      state: claudeVirtual.ui_state,
-      isClaudeFallback: true,
-    });
-  }
-
-  return groups;
-}
-
-function detectHome(sessions: SessionInfo[]): string | undefined {
-  for (const s of sessions) {
-    const m = s.pwd.match(/^(\/Users\/[^/]+|\/home\/[^/]+)/);
-    if (m) return m[1];
-  }
-  return undefined;
-}
-
-function reflectActiveServices(sessions: SessionInfo[]): SessionInfo[] {
-  return sessions.map((s) =>
-    s.busy_type === "service" && s.ui_state === "idle"
-      ? { ...s, ui_state: "service" }
-      : s,
-  );
-}
-
-function overlayClaudeState(sessions: SessionInfo[]): SessionInfo[] {
-  const sessionByPid = new Map<number, SessionInfo>();
-  for (const s of sessions) sessionByPid.set(s.pid, s);
-
-  return sessions.map((s) => {
-    if (!s.has_claude) return s;
-    const claudeSession =
-      (s.claude_pid != null && sessionByPid.get(s.claude_pid)) ||
-      sessionByPid.get(0);
-    if (!claudeSession) return s;
-    const claudeP = statePriority[claudeSession.ui_state] ?? 0;
-    const ownP = statePriority[s.ui_state] ?? 0;
-    return ownP >= claudeP ? s : { ...s, ui_state: claudeSession.ui_state };
-  });
-}
 
 /** Width of the peer-list popover window — must match tauri.conf.json. */
 const POPOVER_WIDTH = 280;
@@ -225,7 +93,7 @@ async function computePopoverScreenPos(
   return new LogicalPosition(Math.round(left), Math.round(top));
 }
 
-export function StatusPill({ status, glow, disabled = false, onOpenChange }: StatusPillProps) {
+export function StatusPill({ status, glow, disabled = false, onOpenChange, onMinimize }: StatusPillProps) {
   // --- Session list state ---
   const [sessionOpen, setSessionOpen] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -538,111 +406,46 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange }: Sta
             )}
           </button>
           )}
+
+          {onMinimize && (
+            <button
+              type="button"
+              data-testid="pill-action-minimize"
+              className="pill-action-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                playClickTap();
+                onMinimize();
+              }}
+              aria-label="Minimize to bar"
+              title="Minimize to bar"
+            >
+              <svg
+                className="pill-action-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
       {sessionListEnabled && sessionOpen && (
-        <div
-          data-testid="session-dropdown"
-          className="session-dropdown"
-          role="menu"
-          style={{
-            top: `${dropdownTop}px`,
-            maxHeight: `${dropdownMaxHeight}px`,
-          }}
-        >
-          {groups.length === 0 ? (
-            <div className="session-empty">No active terminals</div>
-          ) : (
-            groups.map((g) => {
-              const isCollapsed = collapsed.has(g.key);
-              const headContent = (
-                <>
-                  {!g.isClaudeFallback && (
-                    <span className="session-group-caret" aria-hidden="true" />
-                  )}
-                  <span className={`dot small ${g.state}`} />
-                  <span className="session-group-title-row">
-                    <span className="session-group-title">
-                      {groupBasename(g)}
-                    </span>
-                    {g.pretty && g.pretty !== groupBasename(g) && (
-                      <span
-                        className="session-group-info"
-                        aria-label={`Full path: ${g.pretty}`}
-                        onMouseEnter={(e) =>
-                          showPathTooltip(e.currentTarget, g.pretty)
-                        }
-                        onMouseLeave={hidePathTooltip}
-                      >
-                        ?
-                      </span>
-                    )}
-                  </span>
-                </>
-              );
-              return (
-                <div
-                  key={g.key}
-                  className={`session-group ${g.isClaudeFallback ? "claude" : ""}`}
-                  data-testid={`session-group-${g.key}`}
-                >
-                  {g.isClaudeFallback ? (
-                    <div className="session-group-head">{headContent}</div>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`session-group-head clickable ${isCollapsed ? "collapsed" : ""}`}
-                      data-testid={`session-group-head-${g.key}`}
-                      aria-expanded={!isCollapsed}
-                      aria-controls={`session-children-${g.key}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void toggleCollapsed(g.key);
-                      }}
-                    >
-                      {headContent}
-                    </button>
-                  )}
-
-                  {!g.isClaudeFallback && !isCollapsed && (
-                    <div
-                      className="session-children"
-                      id={`session-children-${g.key}`}
-                    >
-                      {g.sessions.map((s) => (
-                        <button
-                          key={s.pid}
-                          type="button"
-                          className={`session-child ${s.has_claude ? "has-claude" : ""}`}
-                          data-testid={`session-item-${s.pid}`}
-                          title="Click to bring this terminal to the front"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            invoke("focus_terminal", { pid: s.pid, tty: s.tty || null })
-                              .catch((err) => console.error("[focus_terminal]", err));
-                            setSessionOpen(false);
-                          }}
-                        >
-                          <span className={`dot small ${s.ui_state}`} />
-                          <span className="session-child-label-row">
-                            <span className="session-child-label">{shellLabel(s)}</span>
-                            {s.has_claude && (
-                              <span
-                                className="session-child-claude"
-                                aria-label="Claude Code running"
-                              />
-                            )}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+        <SessionDropdown
+          groups={groups}
+          collapsed={collapsed}
+          toggleCollapsed={(key) => void toggleCollapsed(key)}
+          onPickSession={() => setSessionOpen(false)}
+          style={{ top: `${dropdownTop}px`, maxHeight: `${dropdownMaxHeight}px` }}
+          showPathTooltip={showPathTooltip}
+          hidePathTooltip={hidePathTooltip}
+        />
       )}
 
       {pathTooltip &&

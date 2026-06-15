@@ -126,6 +126,9 @@ pub fn set_dock_visibility(_app: &tauri::AppHandle, visible: bool) {
     crate::app_log!("[platform] linux dock visibility requested ({}) — no-op", if visible { "visible" } else { "hidden" });
 }
 
+/// macOS-Sequoia drag-to-tile doesn't exist on Linux; no-op.
+pub fn set_window_movable(_app: &tauri::AppHandle, _movable: bool) {}
+
 pub fn open_path(path: &std::path::Path) {
     if let Err(e) = std::process::Command::new("xdg-open").arg(path).spawn() {
         crate::app_error!("[platform] xdg-open path failed: {}", e);

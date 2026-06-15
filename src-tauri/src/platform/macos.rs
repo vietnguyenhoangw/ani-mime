@@ -68,6 +68,35 @@ pub fn setup_main_window(app: &tauri::App) {
     }
 }
 
+/// Toggle whether the OS treats the main window as user-movable.
+///
+/// In mini-bar mode we move the window ourselves via `setPosition`, so we set
+/// the NSWindow non-movable: this stops macOS Sequoia from treating the window
+/// reaching a screen edge as a "drag to tile" gesture (the split-screen zones).
+/// Programmatic `setPosition` still works. In pet mode we restore movability so
+/// the native pet drag (`startDragging`) keeps working.
+pub fn set_window_movable(app: &tauri::AppHandle, movable: bool) {
+    use cocoa::base::{id, NO, YES};
+    use tauri::Manager;
+
+    let Some(window) = app.get_webview_window("main") else {
+        crate::app_warn!("[platform] set_window_movable: main window not found");
+        return;
+    };
+    match window.ns_window() {
+        Ok(ns_win) => {
+            let ns_win = ns_win as id;
+            let flag = if movable { YES } else { NO };
+            unsafe {
+                let _: () = msg_send![ns_win, setMovable: flag];
+                let _: () = msg_send![ns_win, setMovableByWindowBackground: NO];
+            }
+            crate::app_log!("[platform] window movable -> {}", movable);
+        }
+        Err(e) => crate::app_error!("[platform] set_window_movable: NSWindow err: {:?}", e),
+    }
+}
+
 /// Toggle dock icon visibility at runtime.
 /// `visible = false` → Accessory (no dock, no Cmd+Tab)
 /// `visible = true`  → Regular (normal dock app)

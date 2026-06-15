@@ -242,6 +242,13 @@ fn set_dock_visible(visible: bool, app: tauri::AppHandle) {
     platform::set_dock_visibility(&app, visible);
 }
 
+/// Toggle OS window-movability so macOS Sequoia doesn't tile the mini bar when
+/// it reaches a screen edge. Mini mode passes `false`; pet mode passes `true`.
+#[tauri::command]
+fn set_window_movable(movable: bool, app: tauri::AppHandle) {
+    platform::set_window_movable(&app, movable);
+}
+
 #[tauri::command]
 fn set_tray_visible(visible: bool, app: tauri::AppHandle) {
     crate::app_log!("[app] set_tray_visible -> {}", visible);
@@ -626,7 +633,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
-        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins, set_plugin_hotkey, launch_plugin, plugin::gateway::plugin_call])
+        .invoke_handler(tauri::generate_handler![start_visit, get_logs, clear_logs, open_log_dir, get_sessions, get_peers, focus_terminal, open_superpower, set_dev_mode, scenario_override, preview_dialog, set_dock_visible, set_window_movable, set_tray_visible, request_local_network, claude_config::get_claude_config, claude_config::set_plugin_enabled, claude_config::get_command_content, claude_config::delete_command, claude_config::delete_mcp_server, claude_config::delete_hook_entry, install_plugin_from_dialog, uninstall_plugin, set_ani_plugin_enabled, get_plugins, set_plugin_hotkey, launch_plugin, plugin::gateway::plugin_call])
         .setup(|app| {
             crate::app_log!("[app] starting Ani-Mime v{}", env!("CARGO_PKG_VERSION"));
 

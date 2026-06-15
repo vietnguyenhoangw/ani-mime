@@ -5,8 +5,6 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { fetchSessions, type SessionInfo } from "./hooks/useSessions";
 import { useCollapsedSessionGroups } from "./hooks/useCollapsedSessionGroups";
-import { useTheme } from "./hooks/useTheme";
-import { useWindowAutoSize } from "./hooks/useWindowAutoSize";
 import { useQuickClose } from "./hooks/useQuickClose";
 import "./styles/theme.css";
 import "./styles/session-list-window.css";
@@ -151,7 +149,6 @@ function overlayClaudeState(sessions: SessionInfo[]): SessionInfo[] {
 
 export function SessionListApp() {
   useQuickClose();
-  const rootRef = useRef<HTMLDivElement>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
   const [pathTooltip, setPathTooltip] = useState<{
@@ -162,8 +159,10 @@ export function SessionListApp() {
   } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  useTheme();
-  useWindowAutoSize(rootRef);
+  // This dialog is always light, regardless of the app theme.
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute("data-theme", "light");
+  }, []);
 
   // Refresh sessions on mount and whenever the backend fires
   // `sessions-changed` (fingerprint-gated emit). No polling.
@@ -189,11 +188,14 @@ export function SessionListApp() {
     };
   }, []);
 
-  // Hide on focus loss or Escape.
+  // A real window like the plugin dialogs (not a popover): it does NOT hide on
+  // blur. The native title-bar close button hides it (rather than destroying
+  // the static window, so it can reopen); Escape and ⌘W (useQuickClose) hide too.
   useEffect(() => {
     const win = getCurrentWindow();
-    const unlistenP = win.onFocusChanged(({ payload: focused }) => {
-      if (!focused) void win.hide();
+    const unlistenP = win.onCloseRequested((e) => {
+      e.preventDefault();
+      void win.hide();
     });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") void win.hide();
@@ -252,12 +254,17 @@ export function SessionListApp() {
   };
 
   return (
-    <div ref={rootRef} className="session-list-shell">
+    <div className="session-list-shell">
       <div
         className="session-list-root"
         data-testid="session-list-root"
         role="menu"
       >
+        <header className="session-list-header">
+          <h1>Sessions</h1>
+          <p className="sub">Click a terminal to bring it to the front.</p>
+        </header>
+        <div className="session-list-body">
         {groups.length === 0 ? (
           <div className="session-empty">No active terminals</div>
         ) : (
@@ -345,6 +352,7 @@ export function SessionListApp() {
             );
           })
         )}
+        </div>
       </div>
 
       {pathTooltip &&
