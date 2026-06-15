@@ -1,10 +1,9 @@
-/* Styles for the `session-list` Tauri window — a modal dialog matching the
-   clipboard-manager plugin (opaque solid surface + header), while keeping the
-   original session list item styling below. The window is transparent +
-   decoration-less; .session-list-shell pads 12px so the card's shadow isn't
-   clipped by the window edge. */
+/* Styles for the `session-list` Tauri window — a real window like the plugin
+   dialogs (clipboard/translate): native title bar + opaque surface, with the
+   original session list item styling below. The content fills the window; the
+   list scrolls. The native window provides the move bar, close button + shadow. */
 
-/* Opaque modal surface, mirroring the clipboard plugin palette. */
+/* Opaque surface, mirroring the clipboard plugin palette. */
 :root,
 [data-theme="dark"] {
   --sl-surface: #1e1e22;
@@ -18,54 +17,34 @@
 html,
 body,
 #root {
-  background: transparent;
-}
-
-#root {
-  display: inline-block;
-  width: max-content;
+  height: 100%;
+  margin: 0;
+  background: var(--sl-surface);
 }
 
 .session-list-shell {
-  width: max-content;
-  padding: 12px;
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .session-list-root {
-  min-width: 240px;
-  max-width: 360px;
-  padding: 12px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border-radius: 12px;
+  padding: 12px;
   background: var(--sl-surface);
-  border: 1px solid var(--border-pill);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   color: var(--text-primary);
-  animation: session-list-fade-in 0.1s ease-out;
 }
 
-@keyframes session-list-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* --- Modal header (title + subtitle + close), like the clipboard manager --- */
+/* --- Header (title + subtitle), like the clipboard manager --- */
 .session-list-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.session-list-header-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
 }
 
 .session-list-header h1 {
@@ -80,33 +59,12 @@ body,
   color: var(--sl-muted);
 }
 
-.session-list-close {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border-radius: 6px;
-  background: var(--bg-pill-hover);
-  border: 1px solid var(--border-pill);
-  color: var(--text-primary);
-  opacity: 0.7;
-  cursor: pointer;
-  transition: opacity 0.12s, background 0.12s, border-color 0.12s;
-}
-
-.session-list-close:hover {
-  opacity: 1;
-  border-color: var(--border-pill-hover);
-}
-
-/* List body scrolls inside the dialog when there are many sessions. */
+/* List body fills the rest of the window and scrolls when long. */
 .session-list-body {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  max-height: 320px;
   overflow-y: auto;
 }
 

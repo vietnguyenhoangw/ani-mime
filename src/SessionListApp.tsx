@@ -5,7 +5,6 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { fetchSessions, type SessionInfo } from "./hooks/useSessions";
 import { useCollapsedSessionGroups } from "./hooks/useCollapsedSessionGroups";
-import { useWindowAutoSize } from "./hooks/useWindowAutoSize";
 import { useQuickClose } from "./hooks/useQuickClose";
 import "./styles/theme.css";
 import "./styles/session-list-window.css";
@@ -150,7 +149,6 @@ function overlayClaudeState(sessions: SessionInfo[]): SessionInfo[] {
 
 export function SessionListApp() {
   useQuickClose();
-  const rootRef = useRef<HTMLDivElement>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
   const [pathTooltip, setPathTooltip] = useState<{
@@ -165,7 +163,6 @@ export function SessionListApp() {
   useLayoutEffect(() => {
     document.documentElement.setAttribute("data-theme", "light");
   }, []);
-  useWindowAutoSize(rootRef);
 
   // Refresh sessions on mount and whenever the backend fires
   // `sessions-changed` (fingerprint-gated emit). No polling.
@@ -191,11 +188,14 @@ export function SessionListApp() {
     };
   }, []);
 
-  // Hide on focus loss or Escape.
+  // A real window like the plugin dialogs (not a popover): it does NOT hide on
+  // blur. The native title-bar close button hides it (rather than destroying
+  // the static window, so it can reopen); Escape and ⌘W (useQuickClose) hide too.
   useEffect(() => {
     const win = getCurrentWindow();
-    const unlistenP = win.onFocusChanged(({ payload: focused }) => {
-      if (!focused) void win.hide();
+    const unlistenP = win.onCloseRequested((e) => {
+      e.preventDefault();
+      void win.hide();
     });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") void win.hide();
@@ -254,29 +254,15 @@ export function SessionListApp() {
   };
 
   return (
-    <div ref={rootRef} className="session-list-shell">
+    <div className="session-list-shell">
       <div
         className="session-list-root"
         data-testid="session-list-root"
         role="menu"
       >
         <header className="session-list-header">
-          <div className="session-list-header-text">
-            <h1>Sessions</h1>
-            <p className="sub">Click a terminal to bring it to the front.</p>
-          </div>
-          <button
-            type="button"
-            className="session-list-close"
-            data-testid="session-list-close"
-            aria-label="Close"
-            title="Close (⌘W)"
-            onClick={() => void getCurrentWindow().hide()}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
+          <h1>Sessions</h1>
+          <p className="sub">Click a terminal to bring it to the front.</p>
         </header>
         <div className="session-list-body">
         {groups.length === 0 ? (

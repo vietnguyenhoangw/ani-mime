@@ -69,16 +69,13 @@
         "label": "session-list",
         "title": "Sessions",
         "url": "session-list.html",
-        "width": 280,
-        "height": 360,
-        "resizable": false,
+        "width": 300,
+        "height": 420,
+        "resizable": true,
         "visible": false,
-        "decorations": false,
-        "transparent": true,
+        "decorations": true,
         "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "focus": true,
-        "shadow": false
+        "focus": true
       }
     ],
     "security": {
