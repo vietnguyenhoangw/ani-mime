@@ -30,6 +30,7 @@ const POPOVER_GAP = 8;
 /** Mini-mode session panel size (logical px) when the list is open. */
 const PANEL_W = 320;
 const PANEL_LIST_H = 360;
+const PANEL_HEADER_H = 40;
 
 interface MiniBarProps {
   status: Status;
@@ -41,6 +42,7 @@ interface MiniBarProps {
 
 export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }: MiniBarProps) {
   const lanButtonRef = useRef<HTMLButtonElement>(null);
+  const didMountRef = useRef(false);
 
   const { enabled: sessionListEnabled } = useSessionList();
   const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
@@ -80,12 +82,14 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
   // On close, re-snap (which resizes the window back to the bar).
   useEffect(() => {
     if (!sessionOpen) {
-      snapToNearest();
+      if (didMountRef.current) snapToNearest();
+      didMountRef.current = true;
       return;
     }
+    didMountRef.current = true;
     const vertical = orientation === "vertical";
-    const w = vertical ? PANEL_W : Math.max(PANEL_W, 168);
-    const h = vertical ? PANEL_LIST_H : 40 + PANEL_LIST_H;
+    const w = PANEL_W;
+    const h = vertical ? PANEL_LIST_H : PANEL_HEADER_H + PANEL_LIST_H;
     void getCurrentWindow().setSize(new LogicalSize(w, h)).catch(() => {});
   }, [sessionOpen, orientation]); // eslint-disable-line react-hooks/exhaustive-deps
 
