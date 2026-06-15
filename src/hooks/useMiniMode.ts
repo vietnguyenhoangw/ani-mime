@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCurrentWindow,
+  currentMonitor,
+  availableMonitors,
   LogicalPosition,
   LogicalSize,
+  type Monitor,
 } from "@tauri-apps/api/window";
 import { getDefaultPetSize } from "./useWindowDefaultSize";
 import { useSessionList } from "./useSessionList";
@@ -11,6 +14,7 @@ import {
   computeSnap,
   miniBarLength,
   BAR_SHORT,
+  DEFAULT_MARGINS,
   type SnapMargins,
   type Orientation,
   type Edge,
@@ -19,24 +23,48 @@ import {
 
 export type Mode = "pet" | "mini";
 
-/** Gap from the work-area edges (uniform — the work area already excludes the
- *  menu bar and Dock, so no special top margin is needed). */
-const WORK_MARGINS: SnapMargins = { edge: 8, menuBar: 8 };
-
-/**
- * The current screen's WORK AREA in CSS pixels — the same unit as
- * `event.screenX/Y` (cursor) and Tauri's `LogicalPosition` (setPosition), so
- * snapping math is consistent end-to-end. `avail*` excludes the macOS menu bar
- * and Dock, so the bar docks against the usable area, not under them.
- */
-function screenWorkArea(): Rect {
-  const s = window.screen as Screen & { availLeft?: number; availTop?: number };
+/** Convert a Tauri Monitor (physical px) to a logical-px rect, the same space
+ *  as event.screenX/Y and Tauri's LogicalPosition (setPosition). */
+function monitorToLogical(m: Monitor): Rect {
+  const sf = m.scaleFactor || 1;
   return {
-    x: s.availLeft ?? 0,
-    y: s.availTop ?? 0,
-    width: s.availWidth,
-    height: s.availHeight,
+    x: m.position.x / sf,
+    y: m.position.y / sf,
+    width: m.size.width / sf,
+    height: m.size.height / sf,
   };
+}
+
+/** The monitor the window is on, as a logical rect (or null). */
+async function windowMonitorRect(): Promise<Rect | null> {
+  const m = await currentMonitor();
+  return m ? monitorToLogical(m) : null;
+}
+
+/** All monitors as logical rects (for picking the one under the cursor). */
+async function allMonitorRects(): Promise<Rect[]> {
+  const ms = await availableMonitors();
+  return ms.map(monitorToLogical);
+}
+
+/** Pick the monitor rect that contains the point, else the nearest by centre. */
+function monitorContaining(x: number, y: number, monitors: Rect[]): Rect | null {
+  if (monitors.length === 0) return null;
+  for (const m of monitors) {
+    if (x >= m.x && x < m.x + m.width && y >= m.y && y < m.y + m.height) return m;
+  }
+  let best = monitors[0];
+  let bestD = Infinity;
+  for (const m of monitors) {
+    const dx = x - (m.x + m.width / 2);
+    const dy = y - (m.y + m.height / 2);
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = m;
+    }
+  }
+  return best;
 }
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -45,7 +73,8 @@ const clamp = (v: number, lo: number, hi: number) =>
 /**
  * Dock geometry for a given cursor position on a monitor: the bar is glued to
  * whichever edge the cursor is NEAREST, and slides along that edge centred on
- * the cursor (clamped on-screen). Pure, so it can be reasoned about easily.
+ * the cursor (clamped on-screen). The top edge uses the larger menu-bar margin
+ * to clear the macOS menu bar. Pure, so it can be reasoned about easily.
  */
 function dockToCursor(
   cursorX: number,
@@ -53,7 +82,7 @@ function dockToCursor(
   monitor: Rect,
   barLong: number,
   barShort: number,
-  margin: number
+  margins: SnapMargins
 ): { x: number; y: number; width: number; height: number; edge: Edge; orientation: Orientation } {
   const distLeft = cursorX - monitor.x;
   const distRight = monitor.x + monitor.width - cursorX;
@@ -76,22 +105,22 @@ function dockToCursor(
   if (vertical) {
     x =
       edge === "left"
-        ? monitor.x + margin
-        : monitor.x + monitor.width - width - margin;
+        ? monitor.x + margins.edge
+        : monitor.x + monitor.width - width - margins.edge;
     y = clamp(
       cursorY - height / 2,
-      monitor.y + margin,
-      monitor.y + monitor.height - height - margin
+      monitor.y + margins.menuBar,
+      monitor.y + monitor.height - height - margins.edge
     );
   } else {
     y =
       edge === "top"
-        ? monitor.y + margin
-        : monitor.y + monitor.height - height - margin;
+        ? monitor.y + margins.menuBar
+        : monitor.y + monitor.height - height - margins.edge;
     x = clamp(
       cursorX - width / 2,
-      monitor.x + margin,
-      monitor.x + monitor.width - width - margin
+      monitor.x + margins.edge,
+      monitor.x + monitor.width - width - margins.edge
     );
   }
 
@@ -133,7 +162,11 @@ export function useMiniMode(scale: number) {
   const snapToNearest = useCallback(async () => {
     const win = getCurrentWindow();
     try {
-      const monitor = screenWorkArea();
+      const monitor = await windowMonitorRect();
+      if (!monitor) {
+        console.warn("[mini-bar] no monitor; leaving bar where it is");
+        return;
+      }
       const sf = await win.scaleFactor();
       const pos = (await win.outerPosition()).toLogical(sf);
       const size = (await win.outerSize()).toLogical(sf);
@@ -144,7 +177,7 @@ export function useMiniMode(scale: number) {
         monitor,
         barLong,
         barShort,
-        WORK_MARGINS
+        DEFAULT_MARGINS
       );
       setOrientation(snap.orientation);
       setEdge(snap.edge);
@@ -157,16 +190,17 @@ export function useMiniMode(scale: number) {
 
   // Edge-constrained drag. Started from the grip's mousedown. While the button
   // is held, the bar tracks the global cursor (event.screenX/Y, delivered to
-  // this window for the whole press) and docks to the nearest edge, sliding
-  // along it. rAF-throttled so we don't flood the window-move IPC.
+  // this window for the whole press) and docks to whichever monitor + edge the
+  // cursor is on, sliding along it. rAF-throttled so we don't flood the IPC.
   const startEdgeDrag = useCallback(
-    (e: React.MouseEvent) => {
+    async (e: React.MouseEvent) => {
       if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
 
       const win = getCurrentWindow();
-      const monitor = screenWorkArea();
+      const monitors = await allMonitorRects();
+      if (monitors.length === 0) return;
       const barLong = Math.round(barLongLogical * scale);
       const barShort = Math.round(BAR_SHORT * scale);
 
@@ -177,18 +211,29 @@ export function useMiniMode(scale: number) {
       let raf = 0;
       let curW = -1;
       let curH = -1;
+      let logged = false;
 
       const apply = () => {
         raf = 0;
         if (!pending) return;
+        const monitor =
+          monitorContaining(pending.x, pending.y, monitors) ?? monitors[0];
         const dock = dockToCursor(
           pending.x,
           pending.y,
           monitor,
           barLong,
           barShort,
-          WORK_MARGINS.edge
+          DEFAULT_MARGINS
         );
+        if (!logged) {
+          logged = true;
+          console.log("[mini-bar] drag dock", {
+            cursor: pending,
+            monitor,
+            dock,
+          });
+        }
         setOrientation(dock.orientation);
         setEdge(dock.edge);
         if (dock.width !== curW || dock.height !== curH) {
