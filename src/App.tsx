@@ -73,10 +73,9 @@ function App() {
   const visitors = useVisitors();
   const { scale } = useScale();
   const mini = useMiniMode(scale);
-  const { dragging, onMouseDown } = useDrag(
-    mini.mode === "mini" ? mini.magnetToNearest : undefined,
-    { requireHandle: mini.mode === "mini" }
-  );
+  // Pet mode: drag the pet anywhere. Mini mode: the container does NOT drag —
+  // the bar is edge-docked and moved only via the grip (mini.startEdgeDrag).
+  const { dragging, onMouseDown } = useDrag();
   const devMode = useDevMode();
   const devTagToggle = useDevTagVisible();
   const appBoundsToggle = useDevAppBounds();
@@ -434,7 +433,7 @@ function App() {
               : `${PET_BASE_WIDTH}px`,
         minHeight: mini.mode === "mini" ? undefined : `${PET_BASE_HEIGHT}px`,
       }}
-      onMouseDown={onMouseDown}
+      onMouseDown={mini.mode === "mini" ? undefined : onMouseDown}
     >
       {mini.mode === "mini" ? (
         <MiniBar
@@ -442,6 +441,7 @@ function App() {
           orientation={mini.orientation}
           edge={mini.edge}
           snapToNearest={mini.snapToNearest}
+          onGripMouseDown={mini.startEdgeDrag}
           onRestore={mini.exitMini}
         />
       ) : (

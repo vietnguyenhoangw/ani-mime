@@ -33,91 +33,85 @@ async function monitorLogicalRect(): Promise<Rect | null> {
   };
 }
 
-/** Magnet glide duration when the bar is released near an edge. */
-const MAGNET_DURATION_MS = 220;
-
-/** Ease-out: quick pull, then settle gently onto the edge. */
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
-
-type TauriWindow = ReturnType<typeof getCurrentWindow>;
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(v, hi));
 
 /**
- * Glide the window from (fromX,fromY) to (toX,toY) over MAGNET_DURATION_MS
- * using an ease-out curve, so releasing the bar feels like it's magnetically
- * inhaled to the nearest edge.
- *
- * Robustness:
- * - `alive()` lets a newer snap cancel this one (rapid re-drags don't fight).
- * - A safety timeout GUARANTEES the bar lands exactly on the edge even if
- *   requestAnimationFrame is throttled/paused for the small transparent
- *   window (which previously left it stranded mid-screen).
- * Falls back to an instant move when there's no distance or reduced motion.
+ * Dock geometry for a given cursor position on a monitor: the bar is glued to
+ * whichever edge the cursor is NEAREST, and slides along that edge centred on
+ * the cursor (clamped on-screen). Pure, so it can be reasoned about easily.
  */
-async function animateWindowTo(
-  win: TauriWindow,
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
-  alive: () => boolean
-): Promise<void> {
-  if ((fromX === toX && fromY === toY) || prefersReducedMotion()) {
-    await win.setPosition(new LogicalPosition(toX, toY)).catch(() => {});
-    return;
+function dockToCursor(
+  cursorX: number,
+  cursorY: number,
+  monitor: Rect,
+  barLong: number,
+  barShort: number,
+  margins = DEFAULT_MARGINS
+): { x: number; y: number; width: number; height: number; edge: Edge; orientation: Orientation } {
+  const distLeft = cursorX - monitor.x;
+  const distRight = monitor.x + monitor.width - cursorX;
+  const distTop = cursorY - monitor.y;
+  const distBottom = monitor.y + monitor.height - cursorY;
+  const min = Math.min(distLeft, distRight, distTop, distBottom);
+
+  let edge: Edge;
+  if (min === distLeft) edge = "left";
+  else if (min === distRight) edge = "right";
+  else if (min === distTop) edge = "top";
+  else edge = "bottom";
+
+  const vertical = edge === "left" || edge === "right";
+  const width = vertical ? barShort : barLong;
+  const height = vertical ? barLong : barShort;
+
+  let x: number;
+  let y: number;
+  if (vertical) {
+    x =
+      edge === "left"
+        ? monitor.x + margins.edge
+        : monitor.x + monitor.width - width - margins.edge;
+    y = clamp(
+      cursorY - height / 2,
+      monitor.y + margins.menuBar,
+      monitor.y + monitor.height - height - margins.edge
+    );
+  } else {
+    y =
+      edge === "top"
+        ? monitor.y + margins.menuBar
+        : monitor.y + monitor.height - height - margins.edge;
+    x = clamp(
+      cursorX - width / 2,
+      monitor.x + margins.edge,
+      monitor.x + monitor.width - width - margins.edge
+    );
   }
-  await new Promise<void>((resolve) => {
-    const start = performance.now();
-    let done = false;
-    const finish = (landOnEdge: boolean) => {
-      if (done) return;
-      done = true;
-      if (landOnEdge && alive()) {
-        void win.setPosition(new LogicalPosition(toX, toY)).catch(() => {});
-      }
-      resolve();
-    };
-    const tick = (now: number) => {
-      if (done) return;
-      if (!alive()) {
-        finish(false);
-        return;
-      }
-      const t = Math.min(1, (now - start) / MAGNET_DURATION_MS);
-      const e = easeOutCubic(t);
-      const x = Math.round(fromX + (toX - fromX) * e);
-      const y = Math.round(fromY + (toY - fromY) * e);
-      void win.setPosition(new LogicalPosition(x, y)).catch(() => {});
-      if (t < 1) requestAnimationFrame(tick);
-      else finish(true);
-    };
-    requestAnimationFrame(tick);
-    // Safety net: if rAF stalls, force the final landing so the bar never
-    // gets stuck partway (the core "ends up in the middle" bug).
-    setTimeout(() => finish(true), MAGNET_DURATION_MS + 80);
-  });
+
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    width,
+    height,
+    edge,
+    orientation: vertical ? "vertical" : "horizontal",
+  };
 }
 
 /**
- * Owns the pet <-> mini transition and the window resize/snap mechanics.
- * No persistence (the app always launches in pet mode).
+ * Owns the pet <-> mini transition and the window mechanics.
+ *
+ * Mini mode behaves like an edge-docked toolbar: the bar is always glued to a
+ * screen edge. Holding the grip drags it ALONG the nearest edge; pulling the
+ * cursor toward a different edge re-docks the bar to that edge. It never floats
+ * free. No persistence (the app always launches in pet mode).
  */
 export function useMiniMode(scale: number) {
   const [mode, setMode] = useState<Mode>("pet");
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
   const [edge, setEdge] = useState<Edge>("bottom");
   const savedPetPosRef = useRef<LogicalPosition | null>(null);
-  // Bumped on every snap so a newer snap cancels an in-flight magnet glide.
-  const animSeqRef = useRef(0);
 
   // Size the bar to hug its content. miniBarLength already includes the
   // leading dot and trailing grip; here we count only the 20px action
@@ -128,58 +122,98 @@ export function useMiniMode(scale: number) {
     1 /* restore */ + (sessionListEnabled ? 1 : 0) + (lanListEnabled ? 1 : 0);
   const barLongLogical = miniBarLength(actionButtons);
 
-  // Compute the nearest-edge snap and apply it. When `animate` is true the
-  // window glides to the edge (magnet effect); otherwise it moves instantly
-  // (used on enter, panel close, and tool-count re-fit).
-  const applySnap = useCallback(
-    async (animate: boolean) => {
+  // Snap the bar flush to the nearest edge (preserving its along-edge
+  // position). Instant — used on enter, panel close, and tool-count re-fit.
+  const snapToNearest = useCallback(async () => {
+    const win = getCurrentWindow();
+    try {
+      const monitor = await monitorLogicalRect();
+      if (!monitor) {
+        console.warn("[mini-bar] no monitor; leaving bar where it is");
+        return;
+      }
+      const sf = await win.scaleFactor();
+      const pos = (await win.outerPosition()).toLogical(sf);
+      const size = (await win.outerSize()).toLogical(sf);
+      const barLong = Math.round(barLongLogical * scale);
+      const barShort = Math.round(BAR_SHORT * scale);
+      const snap = computeSnap(
+        { x: pos.x, y: pos.y, width: size.width, height: size.height },
+        monitor,
+        barLong,
+        barShort,
+        DEFAULT_MARGINS
+      );
+      setOrientation(snap.orientation);
+      setEdge(snap.edge);
+      await win.setSize(new LogicalSize(snap.width, snap.height));
+      await win.setPosition(new LogicalPosition(snap.x, snap.y));
+    } catch (err) {
+      console.error("[mini-bar] snap failed:", err);
+    }
+  }, [scale, barLongLogical]);
+
+  // Edge-constrained drag. Started from the grip's mousedown. While the button
+  // is held, the bar tracks the global cursor (event.screenX/Y, delivered to
+  // this window for the whole press) and docks to the nearest edge, sliding
+  // along it. rAF-throttled so we don't flood the window-move IPC.
+  const startEdgeDrag = useCallback(
+    async (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
       const win = getCurrentWindow();
-      try {
-        const monitor = await monitorLogicalRect();
-        if (!monitor) {
-          console.warn("[mini-bar] no monitor; leaving bar where dropped");
-          return;
-        }
-        const sf = await win.scaleFactor();
-        const pos = (await win.outerPosition()).toLogical(sf);
-        const size = (await win.outerSize()).toLogical(sf);
-        const barLong = Math.round(barLongLogical * scale);
-        const barShort = Math.round(BAR_SHORT * scale);
-        const snap = computeSnap(
-          { x: pos.x, y: pos.y, width: size.width, height: size.height },
+      const monitor = await monitorLogicalRect();
+      if (!monitor) return;
+      const barLong = Math.round(barLongLogical * scale);
+      const barShort = Math.round(BAR_SHORT * scale);
+
+      let pending: { x: number; y: number } | null = {
+        x: e.screenX,
+        y: e.screenY,
+      };
+      let raf = 0;
+      let curW = -1;
+      let curH = -1;
+
+      const apply = () => {
+        raf = 0;
+        if (!pending) return;
+        const dock = dockToCursor(
+          pending.x,
+          pending.y,
           monitor,
           barLong,
-          barShort,
-          DEFAULT_MARGINS
+          barShort
         );
-        setOrientation(snap.orientation);
-        setEdge(snap.edge);
-        // Supersede any in-flight glide (rapid re-drags / an instant snap
-        // landing during an animation).
-        const mySeq = ++animSeqRef.current;
-        await win.setSize(new LogicalSize(snap.width, snap.height));
-        if (animate) {
-          await animateWindowTo(
-            win,
-            Math.round(pos.x),
-            Math.round(pos.y),
-            snap.x,
-            snap.y,
-            () => animSeqRef.current === mySeq
-          );
-        } else {
-          await win.setPosition(new LogicalPosition(snap.x, snap.y));
+        setOrientation(dock.orientation);
+        setEdge(dock.edge);
+        if (dock.width !== curW || dock.height !== curH) {
+          curW = dock.width;
+          curH = dock.height;
+          void win.setSize(new LogicalSize(dock.width, dock.height)).catch(() => {});
         }
-      } catch (err) {
-        console.error("[mini-bar] snap failed:", err);
-      }
+        void win.setPosition(new LogicalPosition(dock.x, dock.y)).catch(() => {});
+      };
+
+      const onMove = (ev: MouseEvent) => {
+        pending = { x: ev.screenX, y: ev.screenY };
+        if (!raf) raf = requestAnimationFrame(apply);
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        if (raf) cancelAnimationFrame(raf);
+        apply(); // ensure the final position is committed
+      };
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      apply(); // dock immediately on grab
     },
     [scale, barLongLogical]
   );
-
-  const snapToNearest = useCallback(() => applySnap(false), [applySnap]);
-  /** Animated snap — used on drag release for the magnet "inhale" feel. */
-  const magnetToNearest = useCallback(() => applySnap(true), [applySnap]);
 
   // Re-fit the bar when the visible-tool count changes (a tool toggled in
   // Settings while minimized) so the bar always hugs its content.
@@ -217,5 +251,13 @@ export function useMiniMode(scale: number) {
     }
   }, [scale]);
 
-  return { mode, orientation, edge, enterMini, exitMini, snapToNearest, magnetToNearest };
+  return {
+    mode,
+    orientation,
+    edge,
+    enterMini,
+    exitMini,
+    snapToNearest,
+    startEdgeDrag,
+  };
 }

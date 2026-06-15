@@ -43,10 +43,12 @@ interface MiniBarProps {
   orientation: Orientation;
   edge: Edge;
   snapToNearest: () => void;
+  /** mousedown on the grip — starts the edge-constrained drag. */
+  onGripMouseDown: (e: React.MouseEvent) => void;
   onRestore: () => void;
 }
 
-export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }: MiniBarProps) {
+export function MiniBar({ status, orientation, edge, snapToNearest, onGripMouseDown, onRestore }: MiniBarProps) {
   // Tracks the session panel's previous open state so we only snap the bar
   // back when the panel actually closes — NOT on orientation changes, which
   // would otherwise interrupt the magnet glide mid-flight.
@@ -274,11 +276,11 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
 
       <span
         data-testid="mini-bar-drag-handle"
-        data-drag-handle
         className="mini-bar-grip"
         role="separator"
         aria-label="Drag to move"
         title="Hold to move"
+        onMouseDown={onGripMouseDown}
       >
         {/* Tight, flush 2×3 grip so its right edge hugs the bar edge the
             same ~8px as the status dot hugs the left. */}
