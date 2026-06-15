@@ -12,6 +12,7 @@ import {
   BAR_SHORT,
   DEFAULT_MARGINS,
   type Orientation,
+  type Edge,
   type Rect,
 } from "../utils/snap";
 
@@ -37,6 +38,7 @@ async function monitorLogicalRect(): Promise<Rect | null> {
 export function useMiniMode(scale: number) {
   const [mode, setMode] = useState<Mode>("pet");
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
+  const [edge, setEdge] = useState<Edge>("bottom");
   const savedPetPosRef = useRef<LogicalPosition | null>(null);
 
   const snapToNearest = useCallback(async () => {
@@ -60,6 +62,7 @@ export function useMiniMode(scale: number) {
         DEFAULT_MARGINS
       );
       setOrientation(snap.orientation);
+      setEdge(snap.edge);
       await win.setSize(new LogicalSize(snap.width, snap.height));
       await win.setPosition(new LogicalPosition(snap.x, snap.y));
     } catch (err) {
@@ -97,5 +100,5 @@ export function useMiniMode(scale: number) {
     }
   }, [scale]);
 
-  return { mode, orientation, enterMini, exitMini, snapToNearest };
+  return { mode, orientation, edge, enterMini, exitMini, snapToNearest };
 }

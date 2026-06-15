@@ -439,6 +439,7 @@ function App() {
         <MiniBar
           status={status}
           orientation={mini.orientation}
+          edge={mini.edge}
           onRestore={mini.exitMini}
         />
       ) : (
