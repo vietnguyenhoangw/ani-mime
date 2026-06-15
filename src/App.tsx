@@ -74,7 +74,8 @@ function App() {
   const { scale } = useScale();
   const mini = useMiniMode(scale);
   const { dragging, onMouseDown } = useDrag(
-    mini.mode === "mini" ? mini.snapToNearest : undefined
+    mini.mode === "mini" ? mini.snapToNearest : undefined,
+    { requireHandle: mini.mode === "mini" }
   );
   const devMode = useDevMode();
   const devTagToggle = useDevTagVisible();

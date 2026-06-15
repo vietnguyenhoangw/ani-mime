@@ -29,4 +29,27 @@ describe("useDrag", () => {
     });
     expect(getCurrentWindow().startDragging).not.toHaveBeenCalled();
   });
+
+  it("with requireHandle, only drags from a [data-drag-handle] element", async () => {
+    const onDragEnd = vi.fn();
+    const { result } = renderHook(() =>
+      useDrag(onDragEnd, { requireHandle: true })
+    );
+
+    // Press on a plain element inside the bar — must NOT drag.
+    const plain = document.createElement("div");
+    await act(async () => {
+      await result.current.onMouseDown(mouseEvent(plain));
+    });
+    expect(getCurrentWindow().startDragging).not.toHaveBeenCalled();
+
+    // Press on the drag handle — must drag and re-snap.
+    const handle = document.createElement("span");
+    handle.setAttribute("data-drag-handle", "");
+    await act(async () => {
+      await result.current.onMouseDown(mouseEvent(handle));
+    });
+    expect(getCurrentWindow().startDragging).toHaveBeenCalledTimes(1);
+    expect(onDragEnd).toHaveBeenCalledTimes(1);
+  });
 });

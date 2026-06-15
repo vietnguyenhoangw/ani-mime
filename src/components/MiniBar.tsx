@@ -264,6 +264,24 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
         </svg>
       </button>
 
+      <span
+        data-testid="mini-bar-drag-handle"
+        data-drag-handle
+        className="mini-bar-grip"
+        role="separator"
+        aria-label="Drag to move"
+        title="Hold to move"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="9" cy="6" r="1.6" />
+          <circle cx="15" cy="6" r="1.6" />
+          <circle cx="9" cy="12" r="1.6" />
+          <circle cx="15" cy="12" r="1.6" />
+          <circle cx="9" cy="18" r="1.6" />
+          <circle cx="15" cy="18" r="1.6" />
+        </svg>
+      </span>
+
       {sessionOpen && (
         <SessionDropdown
           groups={groups}

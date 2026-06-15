@@ -26,6 +26,13 @@ describe("MiniBar", () => {
     expect(bar).toHaveClass("idle");
   });
 
+  it("renders a drag handle marked for window dragging", () => {
+    render(<MiniBar status="idle" orientation="horizontal" edge="bottom" snapToNearest={() => {}} onRestore={() => {}} />);
+    const grip = screen.getByTestId("mini-bar-drag-handle");
+    expect(grip).toBeInTheDocument();
+    expect(grip).toHaveAttribute("data-drag-handle");
+  });
+
   it("calls onRestore when the restore button is clicked", () => {
     const onRestore = vi.fn();
     render(<MiniBar status="idle" orientation="horizontal" edge="bottom" snapToNearest={() => {}} onRestore={onRestore} />);

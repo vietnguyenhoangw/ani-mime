@@ -32,6 +32,30 @@
    so hover fill, press animation, icon opacity, and active/has-peers
    highlights are identical to the pet-mode pill. */
 
+/* Drag handle (6-dot grip). The ONLY element that moves the bar — see
+   useDrag({ requireHandle: true }). Pressing anywhere else does nothing. */
+.mini-bar-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-primary);
+  opacity: 0.4;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: opacity 0.12s;
+}
+
+.mini-bar-grip:hover {
+  opacity: 0.8;
+}
+
+.mini-bar-grip:active {
+  cursor: grabbing;
+}
+
 /* Status glow — colors mirror the .dot.* values in status-pill.css. */
 .mini-bar.idle         { box-shadow: 0 0 8px rgba(52, 199, 89, 0.5),  0 0 18px rgba(52, 199, 89, 0.3); }
 .mini-bar.busy         { box-shadow: 0 0 8px rgba(255, 59, 48, 0.5),  0 0 18px rgba(255, 59, 48, 0.3); }
