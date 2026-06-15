@@ -39,7 +39,7 @@ export const BAR_SHORT = 40;
 export const MINI_BAR = {
   dot: 7, // leading status dot (bare, hugs the edge)
   button: 20, // action buttons (session/peer/restore)
-  grip: 7, // trailing drag-handle glyph (flush, hugs the edge)
+  grip: 5, // trailing drag-handle glyph (small, flush, hugs the edge)
   gap: 6,
   padding: 8, // along the long axis, each side
   border: 1, // each side
