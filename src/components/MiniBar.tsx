@@ -211,7 +211,9 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
       data-orientation={orientation}
       className={`mini-bar ${orientation} ${status}`}
     >
-      <span data-testid="mini-bar-dot" className={`dot ${status}`} />
+      <span className="mini-bar-dot-slot">
+        <span data-testid="mini-bar-dot" className={`dot ${status}`} />
+      </span>
 
       {sessionListEnabled && (
         <button

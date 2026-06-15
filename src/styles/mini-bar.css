@@ -27,6 +27,17 @@
   padding: 8px 0;
 }
 
+/* Status dot sits in a button-sized slot so the leading element matches
+   the trailing grip — the first and last edge gaps stay equal. */
+.mini-bar-dot-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
 /* Mini-bar tool buttons reuse the status-pill button styling
    (.pill-action-btn / .pill-action-icon, defined in status-pill.css)
    so hover fill, press animation, icon opacity, and active/has-peers

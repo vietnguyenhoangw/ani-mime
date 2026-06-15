@@ -37,7 +37,9 @@ export const BAR_SHORT = 40;
  * window hugs its content exactly.
  */
 export const MINI_BAR = {
-  dot: 7,
+  // The status dot sits in a button-sized slot so the leading element
+  // matches the trailing grip — keeps the first/last edge gaps equal.
+  dot: 20,
   button: 20,
   gap: 6,
   padding: 8, // along the long axis, each side
