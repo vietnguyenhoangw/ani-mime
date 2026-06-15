@@ -349,32 +349,6 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange, onMin
         </span>
 
         <div className="pill-actions" data-testid="pill-actions">
-          {onMinimize && (
-            <button
-              type="button"
-              data-testid="pill-action-minimize"
-              className="pill-action-btn"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                playClickTap();
-                onMinimize();
-              }}
-              aria-label="Minimize to bar"
-              title="Minimize to bar"
-            >
-              <svg
-                className="pill-action-icon"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M6 19h12v2H6z" />
-              </svg>
-            </button>
-          )}
           {sessionListEnabled && (
             <button
               type="button"
@@ -431,6 +405,33 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange, onMin
               </span>
             )}
           </button>
+          )}
+
+          {onMinimize && (
+            <button
+              type="button"
+              data-testid="pill-action-minimize"
+              className="pill-action-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                playClickTap();
+                onMinimize();
+              }}
+              aria-label="Minimize to bar"
+              title="Minimize to bar"
+            >
+              <svg
+                className="pill-action-icon"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+              </svg>
+            </button>
           )}
         </div>
       </div>
