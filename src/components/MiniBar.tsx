@@ -21,6 +21,9 @@ import {
 import { useSessionList } from "../hooks/useSessionList";
 import { useLanList } from "../hooks/useLanList";
 import { useCollapsedSessionGroups } from "../hooks/useCollapsedSessionGroups";
+import { usePeers } from "../hooks/usePeers";
+import { useSoundSettings } from "../hooks/useSoundSettings";
+import { playAudio } from "../utils/audio";
 import { SessionDropdown } from "./SessionDropdown";
 import "../styles/mini-bar.css";
 import "../styles/status-pill.css";
@@ -52,16 +55,36 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
   // (you can't start a second visit). The session list stays available.
   const peerDisabled = status === "visiting";
   const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
+  const peers = usePeers();
   const [sessionOpen, setSessionOpen] = useState(false);
+  const [peerOpen, setPeerOpen] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
+
+  // UI click feedback, gated by the master sound toggle — same as StatusPill.
+  const soundSettings = useSoundSettings();
+  const playClickTap = () => {
+    if (soundSettings.master) playAudio("tap");
+  };
 
   const toggleSession = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!sessionListEnabled) return;
+    playClickTap();
     if (sessionOpen) {
       setSessionOpen(false);
       return;
+    }
+    // Only one popover at a time — hide the peer popover before opening.
+    // Guarded so a popover lookup failure never blocks opening the list.
+    try {
+      const popover = await WebviewWindow.getByLabel("peer-list");
+      if (popover && (await popover.isVisible())) {
+        await popover.hide().catch(() => {});
+        setPeerOpen(false);
+      }
+    } catch {
+      /* peer window unavailable — ignore */
     }
     const list = await fetchSessions();
     setGroups(groupSessions(overlayClaudeState(reflectActiveServices(list)), detectHome(list)));
@@ -131,18 +154,40 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
       const popover = await WebviewWindow.getByLabel("peer-list");
       await popover?.hide().catch(() => {});
     })();
+    setPeerOpen(false);
   }, [lanListEnabled, peerDisabled]);
+
+  // Reset the active-state highlight when the popover loses focus (e.g. the
+  // user clicks elsewhere) — same pattern as StatusPill.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      const popover = await WebviewWindow.getByLabel("peer-list");
+      if (!popover) return;
+      const fn = await popover.onFocusChanged(({ payload: focused }) => {
+        if (!focused) setPeerOpen(false);
+      });
+      unlisten = fn;
+    })();
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   const togglePeer = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!lanListEnabled || peerDisabled) return;
+    playClickTap();
     const popover = await WebviewWindow.getByLabel("peer-list");
     if (!popover) return;
     if (await popover.isVisible()) {
       await popover.hide();
+      setPeerOpen(false);
       return;
     }
+    // Only one popover at a time — close the session list before showing.
+    if (sessionOpen) setSessionOpen(false);
     const main = getCurrentWindow();
     const sf = await main.scaleFactor();
     const pos = (await main.outerPosition()).toLogical(sf);
@@ -157,6 +202,7 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
     await popover.setPosition(new LogicalPosition(p.x, p.y));
     await popover.show();
     await popover.setFocus();
+    setPeerOpen(true);
   };
 
   return (
@@ -171,13 +217,13 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
         <button
           type="button"
           data-testid="mini-bar-action-task"
-          className="mini-bar-btn"
+          className={`pill-action-btn ${sessionOpen ? "is-active" : ""}`}
           aria-label="Show sessions list"
           aria-expanded={sessionOpen}
           title="Session list"
           onClick={toggleSession}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <svg className="pill-action-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM7 9h10v2H7V9zm0 4h10v2H7v-2zm0 4h7v2H7v-2z" />
           </svg>
         </button>
@@ -187,13 +233,14 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
         <button
           type="button"
           data-testid="mini-bar-action-lan"
-          className="mini-bar-btn"
+          className={`pill-action-btn ${peerOpen ? "is-active" : ""} ${peers.length > 0 ? "has-peers" : ""}`}
           aria-label="Mime Around You"
+          aria-expanded={peerOpen}
           title="Peers nearby"
           onClick={togglePeer}
           disabled={peerDisabled}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <svg className="pill-action-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M9 2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2v3H5a1 1 0 0 0-1 1v1h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H6v-1h12v1h-1a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1h-2v-1a1 1 0 0 0-1-1h-6V9h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H9z" />
           </svg>
         </button>
@@ -202,12 +249,17 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
       <button
         type="button"
         data-testid="mini-bar-restore"
-        className="mini-bar-btn"
+        className="pill-action-btn"
         aria-label="Restore pet"
         title="Restore"
-        onClick={onRestore}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          playClickTap();
+          onRestore();
+        }}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <svg className="pill-action-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M4 4h7v2H6v5H4V4zm9 0h7v7h-2V6h-5V4zM4 13h2v5h5v2H4v-7zm14 0h2v7h-7v-2h5v-5z" />
         </svg>
       </button>

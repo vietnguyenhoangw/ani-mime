@@ -25,24 +25,10 @@
   padding: 10px 0;
 }
 
-.mini-bar-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border-radius: 6px;
-  background: var(--bg-pill-hover);
-  border: 1px solid var(--border-pill);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.mini-bar-btn:hover {
-  border-color: var(--border-pill-hover);
-}
+/* Mini-bar tool buttons reuse the status-pill button styling
+   (.pill-action-btn / .pill-action-icon, defined in status-pill.css)
+   so hover fill, press animation, icon opacity, and active/has-peers
+   highlights are identical to the pet-mode pill. */
 
 /* Status glow — colors mirror the .dot.* values in status-pill.css. */
 .mini-bar.idle         { box-shadow: 0 0 8px rgba(52, 199, 89, 0.5),  0 0 18px rgba(52, 199, 89, 0.3); }
