@@ -1,12 +1,25 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   getCurrentWindow,
   LogicalPosition,
+  LogicalSize,
 } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { listen } from "@tauri-apps/api/event";
 import type { Status } from "../types/status";
 import type { Orientation, Edge } from "../utils/snap";
 import { inwardPopoverPos } from "../utils/popoverPos";
+import { fetchSessions } from "../hooks/useSessions";
+import {
+  groupSessions,
+  detectHome,
+  reflectActiveServices,
+  overlayClaudeState,
+  type Group,
+} from "../utils/sessionGroups";
+import { useSessionList } from "../hooks/useSessionList";
+import { useCollapsedSessionGroups } from "../hooks/useCollapsedSessionGroups";
+import { SessionDropdown } from "./SessionDropdown";
 import "../styles/mini-bar.css";
 
 /** Peer-list popover window size — must match tauri.conf.json. */
@@ -14,15 +27,67 @@ const PEER_W = 280;
 const PEER_H = 260;
 const POPOVER_GAP = 8;
 
+/** Mini-mode session panel size (logical px) when the list is open. */
+const PANEL_W = 320;
+const PANEL_LIST_H = 360;
+
 interface MiniBarProps {
   status: Status;
   orientation: Orientation;
   edge: Edge;
+  snapToNearest: () => void;
   onRestore: () => void;
 }
 
-export function MiniBar({ status, orientation, edge, onRestore }: MiniBarProps) {
+export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }: MiniBarProps) {
   const lanButtonRef = useRef<HTMLButtonElement>(null);
+
+  const { enabled: sessionListEnabled } = useSessionList();
+  const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
+  const [sessionOpen, setSessionOpen] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+
+  const toggleSession = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!sessionListEnabled) return;
+    if (sessionOpen) {
+      setSessionOpen(false);
+      return;
+    }
+    const list = await fetchSessions();
+    setGroups(groupSessions(overlayClaudeState(reflectActiveServices(list)), detectHome(list)));
+    setSessionOpen(true);
+  };
+
+  // Live refresh while open.
+  useEffect(() => {
+    if (!sessionOpen) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const list = await fetchSessions();
+      if (cancelled) return;
+      setGroups(groupSessions(overlayClaudeState(reflectActiveServices(list)), detectHome(list)));
+    };
+    const unlistenP = listen("sessions-changed", () => void refresh());
+    return () => {
+      cancelled = true;
+      unlistenP.then((fn) => fn());
+    };
+  }, [sessionOpen]);
+
+  // Grow the bar window into a panel while the list is open.
+  // On close, re-snap (which resizes the window back to the bar).
+  useEffect(() => {
+    if (!sessionOpen) {
+      snapToNearest();
+      return;
+    }
+    const vertical = orientation === "vertical";
+    const w = vertical ? PANEL_W : Math.max(PANEL_W, 168);
+    const h = vertical ? PANEL_LIST_H : 40 + PANEL_LIST_H;
+    void getCurrentWindow().setSize(new LogicalSize(w, h)).catch(() => {});
+  }, [sessionOpen, orientation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePeer = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -57,6 +122,22 @@ export function MiniBar({ status, orientation, edge, onRestore }: MiniBarProps) 
     >
       <span data-testid="mini-bar-dot" className={`dot ${status}`} />
 
+      {sessionListEnabled && (
+        <button
+          type="button"
+          data-testid="mini-bar-action-task"
+          className="mini-bar-btn"
+          aria-label="Show sessions list"
+          aria-expanded={sessionOpen}
+          title="Session list"
+          onClick={toggleSession}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1s-2.4.84-2.82 2H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM7 9h10v2H7V9zm0 4h10v2H7v-2zm0 4h7v2H7v-2z" />
+          </svg>
+        </button>
+      )}
+
       <button
         ref={lanButtonRef}
         type="button"
@@ -83,6 +164,18 @@ export function MiniBar({ status, orientation, edge, onRestore }: MiniBarProps) 
           <path d="M4 4h7v2H6v5H4V4zm9 0h7v7h-2V6h-5V4zM4 13h2v5h5v2H4v-7zm14 0h2v7h-7v-2h5v-5z" />
         </svg>
       </button>
+
+      {sessionOpen && (
+        <SessionDropdown
+          groups={groups}
+          collapsed={collapsed}
+          toggleCollapsed={(key) => void toggleCollapsed(key)}
+          onPickSession={() => setSessionOpen(false)}
+          style={{ position: "static", maxHeight: `${PANEL_LIST_H}px`, width: "100%" }}
+          showPathTooltip={() => {}}
+          hidePathTooltip={() => {}}
+        />
+      )}
     </div>
   );
 }

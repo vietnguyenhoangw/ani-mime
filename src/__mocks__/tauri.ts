@@ -4,6 +4,12 @@
  * Provides invoke mock with configurable responses, plus convertFileSrc and appDataDir.
  */
 
+// Defaults applied on every reset so common read-only commands don't throw
+// when a test doesn't care about them. Tests can override via mockInvoke().
+const invokeDefaults: Record<string, unknown> = {
+  get_sessions: [],
+};
+
 const invokeResponses = new Map<string, unknown>();
 
 export const invoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
@@ -24,5 +30,8 @@ export function convertFileSrc(path: string): string {
 
 export function resetMocks() {
   invokeResponses.clear();
+  for (const [cmd, response] of Object.entries(invokeDefaults)) {
+    invokeResponses.set(cmd, response);
+  }
   invoke.mockClear();
 }
