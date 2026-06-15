@@ -30,6 +30,30 @@ export interface SnapResult {
 export const BAR_LONG = 168;
 export const BAR_SHORT = 40;
 
+/**
+ * Mini-bar layout geometry (logical px, before display scale).
+ * These MUST stay in sync with the spacing in `mini-bar.css`
+ * (gap, padding) and the `.pill-action-btn` / `.dot` sizes so the
+ * window hugs its content exactly.
+ */
+export const MINI_BAR = {
+  dot: 7,
+  button: 20,
+  gap: 6,
+  padding: 8, // along the long axis, each side
+  border: 1, // each side
+};
+
+/**
+ * Long-axis length (logical px) for a mini bar holding the status dot plus
+ * `buttons` action buttons. Layout: [pad][dot](gap[button])×buttons[pad],
+ * plus borders. Lets the bar hug its content instead of using a fixed width.
+ */
+export function miniBarLength(buttons: number): number {
+  const g = MINI_BAR;
+  return 2 * g.border + 2 * g.padding + g.dot + buttons * (g.gap + g.button);
+}
+
 export const DEFAULT_MARGINS: SnapMargins = { edge: 8, menuBar: 30 };
 
 /**

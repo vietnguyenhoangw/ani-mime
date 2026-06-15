@@ -9,11 +9,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  /* gap + padding MUST match MINI_BAR geometry in utils/snap.ts so the
+     window (sized by useMiniMode) hugs the content with no dead space. */
+  gap: 6px;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: 20px;
   background: var(--bg-pill);
   border: 1px solid var(--border-pill);
@@ -22,7 +24,7 @@
 
 .mini-bar.vertical {
   flex-direction: column;
-  padding: 10px 0;
+  padding: 8px 0;
 }
 
 /* Mini-bar tool buttons reuse the status-pill button styling

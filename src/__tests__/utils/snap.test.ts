@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeSnap, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS } from "../../utils/snap";
+import { computeSnap, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS, miniBarLength, MINI_BAR } from "../../utils/snap";
 
 const MON = { x: 0, y: 0, width: 1000, height: 800 };
 
@@ -55,5 +55,22 @@ describe("computeSnap", () => {
     const r = computeSnap(win, secondMon, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
     expect(r.edge).toBe("left");
     expect(r.x).toBe(-2560 + DEFAULT_MARGINS.edge);
+  });
+});
+
+describe("miniBarLength", () => {
+  it("accounts for dot, padding and borders with zero buttons", () => {
+    expect(miniBarLength(0)).toBe(
+      2 * MINI_BAR.border + 2 * MINI_BAR.padding + MINI_BAR.dot
+    );
+  });
+
+  it("grows by exactly one button + gap per added tool", () => {
+    expect(miniBarLength(3) - miniBarLength(2)).toBe(MINI_BAR.gap + MINI_BAR.button);
+  });
+
+  it("hugs content far tighter than the legacy fixed width", () => {
+    // 2 buttons (session + restore, peer off) should be well under BAR_LONG.
+    expect(miniBarLength(2)).toBeLessThan(BAR_LONG);
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getCurrentWindow,
   currentMonitor,
@@ -6,9 +6,11 @@ import {
   LogicalSize,
 } from "@tauri-apps/api/window";
 import { getDefaultPetSize } from "./useWindowDefaultSize";
+import { useSessionList } from "./useSessionList";
+import { useLanList } from "./useLanList";
 import {
   computeSnap,
-  BAR_LONG,
+  miniBarLength,
   BAR_SHORT,
   DEFAULT_MARGINS,
   type Orientation,
@@ -41,6 +43,14 @@ export function useMiniMode(scale: number) {
   const [edge, setEdge] = useState<Edge>("bottom");
   const savedPetPosRef = useRef<LogicalPosition | null>(null);
 
+  // Size the bar to hug its content: dot + restore button + whichever
+  // tools are enabled (must match which buttons MiniBar actually renders).
+  const { enabled: sessionListEnabled } = useSessionList();
+  const { enabled: lanListEnabled } = useLanList();
+  const barButtons =
+    1 /* restore */ + (sessionListEnabled ? 1 : 0) + (lanListEnabled ? 1 : 0);
+  const barLongLogical = miniBarLength(barButtons);
+
   const snapToNearest = useCallback(async () => {
     const win = getCurrentWindow();
     try {
@@ -52,7 +62,7 @@ export function useMiniMode(scale: number) {
       const sf = await win.scaleFactor();
       const pos = (await win.outerPosition()).toLogical(sf);
       const size = (await win.outerSize()).toLogical(sf);
-      const barLong = Math.round(BAR_LONG * scale);
+      const barLong = Math.round(barLongLogical * scale);
       const barShort = Math.round(BAR_SHORT * scale);
       const snap = computeSnap(
         { x: pos.x, y: pos.y, width: size.width, height: size.height },
@@ -68,7 +78,13 @@ export function useMiniMode(scale: number) {
     } catch (err) {
       console.error("[mini-bar] snap failed:", err);
     }
-  }, [scale]);
+  }, [scale, barLongLogical]);
+
+  // Re-fit the bar when the visible-tool count changes (a tool toggled in
+  // Settings while minimized) so the bar always hugs its content.
+  useEffect(() => {
+    if (mode === "mini") void snapToNearest();
+  }, [barLongLogical, mode, snapToNearest]);
 
   const enterMini = useCallback(async () => {
     const win = getCurrentWindow();
