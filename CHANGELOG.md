@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.18.0] - 2026-06-15
+
+### Added
+- **Mini bar mode.** A minimize button on the status pill collapses the floating pet into a thin status bar docked to a screen edge. Hold the grip to drag it; it magnet-snaps to the nearest edge on release (vertical on the sides, horizontal on top/bottom) and is multi-monitor aware. The bar shows the live status color, and its session/peer tools each open their own window (the session list as a clipboard-manager-style dialog). On macOS the window opts out of Sequoia edge-tiling while docked.
+
 ## [0.17.14] - 2026-06-08
 
 ### Fixed
