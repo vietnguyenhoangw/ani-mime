@@ -5,7 +5,6 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { fetchSessions, type SessionInfo } from "./hooks/useSessions";
 import { useCollapsedSessionGroups } from "./hooks/useCollapsedSessionGroups";
-import { useTheme } from "./hooks/useTheme";
 import { useWindowAutoSize } from "./hooks/useWindowAutoSize";
 import { useQuickClose } from "./hooks/useQuickClose";
 import "./styles/theme.css";
@@ -162,7 +161,10 @@ export function SessionListApp() {
   } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  useTheme();
+  // This dialog is always light, regardless of the app theme.
+  useLayoutEffect(() => {
+    document.documentElement.setAttribute("data-theme", "light");
+  }, []);
   useWindowAutoSize(rootRef);
 
   // Refresh sessions on mount and whenever the backend fires
@@ -259,8 +261,22 @@ export function SessionListApp() {
         role="menu"
       >
         <header className="session-list-header">
-          <h1>Sessions</h1>
-          <p className="sub">Click a terminal to bring it to the front.</p>
+          <div className="session-list-header-text">
+            <h1>Sessions</h1>
+            <p className="sub">Click a terminal to bring it to the front.</p>
+          </div>
+          <button
+            type="button"
+            className="session-list-close"
+            data-testid="session-list-close"
+            aria-label="Close"
+            title="Close (⌘W)"
+            onClick={() => void getCurrentWindow().hide()}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
         </header>
         <div className="session-list-body">
         {groups.length === 0 ? (

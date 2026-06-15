@@ -53,11 +53,19 @@ body,
   to   { opacity: 1; }
 }
 
-/* --- Modal header (title + subtitle), like the clipboard manager --- */
+/* --- Modal header (title + subtitle + close), like the clipboard manager --- */
 .session-list-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.session-list-header-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .session-list-header h1 {
@@ -70,6 +78,28 @@ body,
   margin: 0;
   font-size: 11px;
   color: var(--sl-muted);
+}
+
+.session-list-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  background: var(--bg-pill-hover);
+  border: 1px solid var(--border-pill);
+  color: var(--text-primary);
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity 0.12s, background 0.12s, border-color 0.12s;
+}
+
+.session-list-close:hover {
+  opacity: 1;
+  border-color: var(--border-pill-hover);
 }
 
 /* List body scrolls inside the dialog when there are many sessions. */
