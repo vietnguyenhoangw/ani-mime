@@ -38,6 +38,7 @@ export const DEFAULT_MARGINS: SnapMargins = { edge: 8, menuBar: 30 };
  * and return the snapped top-left position + the bar orientation/size.
  *
  * Pure: no Tauri calls, plain numbers in and out, so it is unit-testable.
+ * Tie-breaking: when two or more distances are equal, edges are chosen in priority order left > right > top > bottom.
  */
 export function computeSnap(
   win: Rect,
