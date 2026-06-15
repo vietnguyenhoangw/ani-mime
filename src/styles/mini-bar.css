@@ -1,7 +1,12 @@
-/* Collapse the pet container's pet-size minimums while in mini mode. */
+/* Collapse the pet container's pet-size minimums while in mini mode, and make
+   it FILL the window. Without width/height:100% the bar collapses to its
+   content size and #root's centering leaves empty space between the pill and
+   the window edge — which read as the bar "not sticking" to the screen edge. */
 .container.mini-mode {
   min-width: 0 !important;
   min-height: 0 !important;
+  width: 100%;
+  height: 100%;
   padding: 0;
   /* The pet container uses cursor:grab (drag anywhere); in mini mode only
      the grip moves the bar, so the bar/dot use the normal cursor. */
