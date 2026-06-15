@@ -75,9 +75,11 @@ const clamp = (v: number, lo: number, hi: number) =>
 
 /**
  * Dock geometry for a given cursor position on a monitor: the bar is glued to
- * whichever edge the cursor is NEAREST, and slides along that edge centred on
- * the cursor (clamped on-screen). The top edge uses the larger menu-bar margin
- * to clear the macOS menu bar. Pure, so it can be reasoned about easily.
+ * whichever edge the cursor is NEAREST, and positioned along that edge so the
+ * bar's leading corner sits at `cursorAlong + alongOffset` (clamped on-screen).
+ * Pass the offset captured at grab time so the bar keeps the point you grabbed
+ * instead of recentring on the cursor. When `alongOffset` is null the bar is
+ * centred on the cursor. The top edge uses the larger menu-bar margin.
  */
 function dockToCursor(
   cursorX: number,
@@ -85,7 +87,8 @@ function dockToCursor(
   monitor: Rect,
   barLong: number,
   barShort: number,
-  margins: SnapMargins
+  margins: SnapMargins,
+  alongOffset: number | null
 ): { x: number; y: number; width: number; height: number; edge: Edge; orientation: Orientation } {
   const distLeft = cursorX - monitor.x;
   const distRight = monitor.x + monitor.width - cursorX;
@@ -110,8 +113,9 @@ function dockToCursor(
       edge === "left"
         ? monitor.x + margins.edge
         : monitor.x + monitor.width - width - margins.edge;
+    const alongY = alongOffset == null ? cursorY - height / 2 : cursorY + alongOffset;
     y = clamp(
-      cursorY - height / 2,
+      alongY,
       monitor.y + margins.menuBar,
       monitor.y + monitor.height - height - margins.edge
     );
@@ -120,8 +124,9 @@ function dockToCursor(
       edge === "top"
         ? monitor.y + margins.menuBar
         : monitor.y + monitor.height - height - margins.edge;
+    const alongX = alongOffset == null ? cursorX - width / 2 : cursorX + alongOffset;
     x = clamp(
-      cursorX - width / 2,
+      alongX,
       monitor.x + margins.edge,
       monitor.x + monitor.width - width - margins.edge
     );
@@ -207,10 +212,20 @@ export function useMiniMode(scale: number) {
       const barLong = Math.round(barLongLogical * scale);
       const barShort = Math.round(BAR_SHORT * scale);
 
-      let pending: { x: number; y: number } | null = {
-        x: e.screenX,
-        y: e.screenY,
-      };
+      // Capture the grab point so the bar keeps its position relative to the
+      // cursor (no jump-to-centre on grab). Derive the current orientation from
+      // the window's own dimensions, and the along-axis offset from its position.
+      const sf = await win.scaleFactor();
+      const startPos = (await win.outerPosition()).toLogical(sf);
+      const startSize = (await win.outerSize()).toLogical(sf);
+      let grabOrientation: Orientation =
+        startSize.width <= startSize.height ? "vertical" : "horizontal";
+      let grabOffset =
+        grabOrientation === "vertical"
+          ? startPos.y - e.screenY
+          : startPos.x - e.screenX;
+
+      let pending: { x: number; y: number } | null = null;
       let raf = 0;
       let curW = -1;
       let curH = -1;
@@ -220,13 +235,24 @@ export function useMiniMode(scale: number) {
         if (!pending) return;
         const monitor =
           monitorContaining(pending.x, pending.y, monitors) ?? monitors[0];
+
+        // Peek the edge the cursor is nearest to decide orientation. When it
+        // flips to a different edge, recentre (the grab offset no longer maps
+        // across axes); otherwise keep the captured grab offset.
+        const peek = dockToCursor(pending.x, pending.y, monitor, barLong, barShort, MINI_MARGINS, null);
+        if (peek.orientation !== grabOrientation) {
+          grabOrientation = peek.orientation;
+          grabOffset = -barLong / 2; // centre on the cursor after a flip
+        }
+
         const dock = dockToCursor(
           pending.x,
           pending.y,
           monitor,
           barLong,
           barShort,
-          MINI_MARGINS
+          MINI_MARGINS,
+          grabOffset
         );
         setOrientation(dock.orientation);
         setEdge(dock.edge);
@@ -246,12 +272,12 @@ export function useMiniMode(scale: number) {
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onUp);
         if (raf) cancelAnimationFrame(raf);
-        apply(); // ensure the final position is committed
+        if (pending) apply(); // commit final position only if actually moved
       };
 
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
-      apply(); // dock immediately on grab
+      // No immediate apply(): a plain click must not move the bar.
     },
     [scale, barLongLogical]
   );
