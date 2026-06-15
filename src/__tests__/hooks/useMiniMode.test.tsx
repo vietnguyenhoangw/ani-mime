@@ -34,5 +34,6 @@ describe("useMiniMode", () => {
     });
     await waitFor(() => expect(result.current.mode).toBe("pet"));
     expect(win.setSize).toHaveBeenCalled();
+    expect(win.setPosition).toHaveBeenCalled();
   });
 });

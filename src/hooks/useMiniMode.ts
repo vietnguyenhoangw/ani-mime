@@ -91,6 +91,7 @@ export function useMiniMode(scale: number) {
       await win.setSize(new LogicalSize(def.width, def.height));
       const saved = savedPetPosRef.current;
       if (saved) await win.setPosition(saved);
+      savedPetPosRef.current = null;
     } catch (err) {
       console.error("[mini-bar] restore failed:", err);
     }
