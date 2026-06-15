@@ -4,40 +4,48 @@ import { computeSnap, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS, miniBarLength, MINI_
 const MON = { x: 0, y: 0, width: 1000, height: 800 };
 
 describe("computeSnap", () => {
-  it("snaps to the LEFT edge, TOP corner (vertical bar)", () => {
-    const r = computeSnap({ x: 30, y: 16, width: 40, height: 168 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
+  it("snaps to the LEFT edge, keeping the dropped Y (vertical bar)", () => {
+    const r = computeSnap({ x: 30, y: 300, width: 40, height: 168 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
     expect(r.edge).toBe("left");
     expect(r.orientation).toBe("vertical");
     expect(r.width).toBe(BAR_SHORT);
     expect(r.height).toBe(BAR_LONG);
-    expect(r.x).toBe(8);
-    expect(r.y).toBe(30);
+    expect(r.x).toBe(8); // flush to left edge + margin
+    expect(r.y).toBe(300); // along-edge position preserved
   });
 
-  it("snaps to the RIGHT edge, BOTTOM corner (vertical bar)", () => {
-    const r = computeSnap({ x: 930, y: 616, width: 40, height: 168 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
+  it("snaps to the RIGHT edge, keeping the dropped Y (vertical bar)", () => {
+    const r = computeSnap({ x: 930, y: 600, width: 40, height: 168 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
     expect(r.edge).toBe("right");
     expect(r.orientation).toBe("vertical");
     expect(r.x).toBe(1000 - BAR_SHORT - 8);
-    expect(r.y).toBe(800 - BAR_LONG - 8);
+    expect(r.y).toBe(600); // preserved
   });
 
-  it("snaps to the TOP edge, RIGHT corner (horizontal bar)", () => {
-    const r = computeSnap({ x: 816, y: 30, width: 168, height: 40 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
+  it("snaps to the TOP edge, keeping the dropped X (horizontal bar)", () => {
+    const r = computeSnap({ x: 400, y: 20, width: 168, height: 40 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
     expect(r.edge).toBe("top");
     expect(r.orientation).toBe("horizontal");
     expect(r.width).toBe(BAR_LONG);
     expect(r.height).toBe(BAR_SHORT);
-    expect(r.y).toBe(30);
-    expect(r.x).toBe(1000 - BAR_LONG - 8);
+    expect(r.y).toBe(30); // menu-bar clearance
+    expect(r.x).toBe(400); // preserved
   });
 
-  it("snaps to the BOTTOM edge, LEFT corner (horizontal bar)", () => {
-    const r = computeSnap({ x: 16, y: 730, width: 168, height: 40 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
+  it("snaps to the BOTTOM edge, keeping the dropped X (horizontal bar)", () => {
+    const r = computeSnap({ x: 300, y: 740, width: 168, height: 40 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
     expect(r.edge).toBe("bottom");
     expect(r.orientation).toBe("horizontal");
     expect(r.y).toBe(800 - BAR_SHORT - 8);
-    expect(r.x).toBe(8);
+    expect(r.x).toBe(300); // preserved
+  });
+
+  it("clamps the along-edge position so the bar stays fully on-screen", () => {
+    // Dropped near the top, far to the right — should stay on top edge but
+    // clamp X so the bar doesn't overflow past the right edge.
+    const r = computeSnap({ x: 870, y: 10, width: 168, height: 40 }, MON, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
+    expect(r.edge).toBe("top");
+    expect(r.x).toBe(1000 - BAR_LONG - 8); // clamped to max X (824)
   });
 
   it("exports sane default bar constants", () => {
@@ -50,11 +58,12 @@ describe("computeSnap", () => {
 
   it("snaps to the LEFT edge on a secondary monitor with negative origin", () => {
     const secondMon = { x: -2560, y: 0, width: 2560, height: 1440 };
-    // Window centered near the left edge of the secondary monitor
+    // Window near the left edge of the secondary monitor
     const win = { x: -2550, y: 600, width: BAR_SHORT, height: BAR_LONG };
     const r = computeSnap(win, secondMon, BAR_LONG, BAR_SHORT, DEFAULT_MARGINS);
     expect(r.edge).toBe("left");
     expect(r.x).toBe(-2560 + DEFAULT_MARGINS.edge);
+    expect(r.y).toBe(600); // preserved
   });
 });
 

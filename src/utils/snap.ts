@@ -66,8 +66,9 @@ export const DEFAULT_MARGINS: SnapMargins = { edge: 8, menuBar: 30 };
 
 /**
  * Given the current window rect and the monitor rect (both logical px),
- * pick the nearest of the four edges, then the nearest corner on that edge,
- * and return the snapped top-left position + the bar orientation/size.
+ * pick the NEAREST edge and snap the bar flush to it (magnet), KEEPING the
+ * bar's position ALONG that edge (clamped on-screen) rather than jumping to a
+ * corner. Returns the snapped top-left position + the bar orientation/size.
  *
  * Pure: no Tauri calls, plain numbers in and out, so it is unit-testable.
  * Tie-breaking: when two or more distances are equal, edges are chosen in priority order left > right > top > bottom.
@@ -99,27 +100,35 @@ export function computeSnap(
   const width = vertical ? barShort : barLong;
   const height = vertical ? barLong : barShort;
 
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.max(lo, Math.min(v, hi));
+
   let x: number;
   let y: number;
 
   if (vertical) {
+    // Flush to the left/right edge; keep the dropped Y, clamped on-screen
+    // (top clearance respects the menu bar).
     x =
       edge === "left"
         ? monitor.x + margins.edge
         : monitor.x + monitor.width - width - margins.edge;
-    const topHalf = cy < monitor.y + monitor.height / 2;
-    y = topHalf
-      ? monitor.y + margins.menuBar
-      : monitor.y + monitor.height - height - margins.edge;
+    y = clamp(
+      win.y,
+      monitor.y + margins.menuBar,
+      monitor.y + monitor.height - height - margins.edge
+    );
   } else {
+    // Flush to the top/bottom edge; keep the dropped X, clamped on-screen.
     y =
       edge === "top"
         ? monitor.y + margins.menuBar
         : monitor.y + monitor.height - height - margins.edge;
-    const leftHalf = cx < monitor.x + monitor.width / 2;
-    x = leftHalf
-      ? monitor.x + margins.edge
-      : monitor.x + monitor.width - width - margins.edge;
+    x = clamp(
+      win.x,
+      monitor.x + margins.edge,
+      monitor.x + monitor.width - width - margins.edge
+    );
   }
 
   return {

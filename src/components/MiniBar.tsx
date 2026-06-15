@@ -47,7 +47,10 @@ interface MiniBarProps {
 }
 
 export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }: MiniBarProps) {
-  const didMountRef = useRef(false);
+  // Tracks the session panel's previous open state so we only snap the bar
+  // back when the panel actually closes — NOT on orientation changes, which
+  // would otherwise interrupt the magnet glide mid-flight.
+  const prevSessionOpenRef = useRef(false);
 
   const { enabled: sessionListEnabled } = useSessionList();
   const { enabled: lanListEnabled } = useLanList();
@@ -111,11 +114,16 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
   // On close, re-snap (which resizes the window back to the bar).
   useEffect(() => {
     if (!sessionOpen) {
-      if (didMountRef.current) snapToNearest();
-      didMountRef.current = true;
+      // Only restore the bar size when the panel was just open (panel→bar).
+      // Orientation changes while closed come from a snap that already
+      // positioned the bar, so don't re-snap here.
+      if (prevSessionOpenRef.current) {
+        prevSessionOpenRef.current = false;
+        snapToNearest();
+      }
       return;
     }
-    didMountRef.current = true;
+    prevSessionOpenRef.current = true;
     const vertical = orientation === "vertical";
     const w = PANEL_W;
     const h = vertical ? PANEL_LIST_H : PANEL_HEADER_H + PANEL_LIST_H;

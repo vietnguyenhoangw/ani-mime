@@ -54,15 +54,22 @@ type TauriWindow = ReturnType<typeof getCurrentWindow>;
 /**
  * Glide the window from (fromX,fromY) to (toX,toY) over MAGNET_DURATION_MS
  * using an ease-out curve, so releasing the bar feels like it's magnetically
- * inhaled to the nearest edge. Falls back to an instant move when there's no
- * distance to cover or the user prefers reduced motion.
+ * inhaled to the nearest edge.
+ *
+ * Robustness:
+ * - `alive()` lets a newer snap cancel this one (rapid re-drags don't fight).
+ * - A safety timeout GUARANTEES the bar lands exactly on the edge even if
+ *   requestAnimationFrame is throttled/paused for the small transparent
+ *   window (which previously left it stranded mid-screen).
+ * Falls back to an instant move when there's no distance or reduced motion.
  */
 async function animateWindowTo(
   win: TauriWindow,
   fromX: number,
   fromY: number,
   toX: number,
-  toY: number
+  toY: number,
+  alive: () => boolean
 ): Promise<void> {
   if ((fromX === toX && fromY === toY) || prefersReducedMotion()) {
     await win.setPosition(new LogicalPosition(toX, toY)).catch(() => {});
@@ -70,16 +77,33 @@ async function animateWindowTo(
   }
   await new Promise<void>((resolve) => {
     const start = performance.now();
+    let done = false;
+    const finish = (landOnEdge: boolean) => {
+      if (done) return;
+      done = true;
+      if (landOnEdge && alive()) {
+        void win.setPosition(new LogicalPosition(toX, toY)).catch(() => {});
+      }
+      resolve();
+    };
     const tick = (now: number) => {
+      if (done) return;
+      if (!alive()) {
+        finish(false);
+        return;
+      }
       const t = Math.min(1, (now - start) / MAGNET_DURATION_MS);
       const e = easeOutCubic(t);
       const x = Math.round(fromX + (toX - fromX) * e);
       const y = Math.round(fromY + (toY - fromY) * e);
       void win.setPosition(new LogicalPosition(x, y)).catch(() => {});
       if (t < 1) requestAnimationFrame(tick);
-      else resolve();
+      else finish(true);
     };
     requestAnimationFrame(tick);
+    // Safety net: if rAF stalls, force the final landing so the bar never
+    // gets stuck partway (the core "ends up in the middle" bug).
+    setTimeout(() => finish(true), MAGNET_DURATION_MS + 80);
   });
 }
 
@@ -92,6 +116,8 @@ export function useMiniMode(scale: number) {
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
   const [edge, setEdge] = useState<Edge>("bottom");
   const savedPetPosRef = useRef<LogicalPosition | null>(null);
+  // Bumped on every snap so a newer snap cancels an in-flight magnet glide.
+  const animSeqRef = useRef(0);
 
   // Size the bar to hug its content. miniBarLength already includes the
   // leading dot and trailing grip; here we count only the 20px action
@@ -128,6 +154,9 @@ export function useMiniMode(scale: number) {
         );
         setOrientation(snap.orientation);
         setEdge(snap.edge);
+        // Supersede any in-flight glide (rapid re-drags / an instant snap
+        // landing during an animation).
+        const mySeq = ++animSeqRef.current;
         await win.setSize(new LogicalSize(snap.width, snap.height));
         if (animate) {
           await animateWindowTo(
@@ -135,7 +164,8 @@ export function useMiniMode(scale: number) {
             Math.round(pos.x),
             Math.round(pos.y),
             snap.x,
-            snap.y
+            snap.y,
+            () => animSeqRef.current === mySeq
           );
         } else {
           await win.setPosition(new LogicalPosition(snap.x, snap.y));
