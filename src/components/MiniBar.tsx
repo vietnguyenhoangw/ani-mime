@@ -211,9 +211,7 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
       data-orientation={orientation}
       className={`mini-bar ${orientation} ${status}`}
     >
-      <span className="mini-bar-dot-slot">
-        <span data-testid="mini-bar-dot" className={`dot ${status}`} />
-      </span>
+      <span data-testid="mini-bar-dot" className={`dot ${status}`} />
 
       {sessionListEnabled && (
         <button
@@ -274,13 +272,15 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
         aria-label="Drag to move"
         title="Hold to move"
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <circle cx="9" cy="6" r="1.6" />
-          <circle cx="15" cy="6" r="1.6" />
-          <circle cx="9" cy="12" r="1.6" />
-          <circle cx="15" cy="12" r="1.6" />
-          <circle cx="9" cy="18" r="1.6" />
-          <circle cx="15" cy="18" r="1.6" />
+        {/* Tight, flush 2×3 grip so its right edge hugs the bar edge the
+            same ~8px as the status dot hugs the left. */}
+        <svg width="7" height="14" viewBox="0 0 7 14" fill="currentColor" aria-hidden="true">
+          <circle cx="1.5" cy="1.5" r="1.5" />
+          <circle cx="5.5" cy="1.5" r="1.5" />
+          <circle cx="1.5" cy="7" r="1.5" />
+          <circle cx="5.5" cy="7" r="1.5" />
+          <circle cx="1.5" cy="12.5" r="1.5" />
+          <circle cx="5.5" cy="12.5" r="1.5" />
         </svg>
       </span>
 

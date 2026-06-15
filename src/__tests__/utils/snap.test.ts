@@ -59,13 +59,16 @@ describe("computeSnap", () => {
 });
 
 describe("miniBarLength", () => {
-  it("accounts for dot, padding and borders with zero buttons", () => {
+  it("accounts for dot, grip, padding and borders with zero action buttons", () => {
     expect(miniBarLength(0)).toBe(
-      2 * MINI_BAR.border + 2 * MINI_BAR.padding + MINI_BAR.dot
+      2 * MINI_BAR.border +
+        2 * MINI_BAR.padding +
+        MINI_BAR.dot +
+        (MINI_BAR.gap + MINI_BAR.grip)
     );
   });
 
-  it("grows by exactly one button + gap per added tool", () => {
+  it("grows by exactly one button + gap per added action button", () => {
     expect(miniBarLength(3) - miniBarLength(2)).toBe(MINI_BAR.gap + MINI_BAR.button);
   });
 

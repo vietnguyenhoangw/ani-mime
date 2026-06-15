@@ -37,23 +37,29 @@ export const BAR_SHORT = 40;
  * window hugs its content exactly.
  */
 export const MINI_BAR = {
-  // The status dot sits in a button-sized slot so the leading element
-  // matches the trailing grip — keeps the first/last edge gaps equal.
-  dot: 20,
-  button: 20,
+  dot: 7, // leading status dot (bare, hugs the edge)
+  button: 20, // action buttons (session/peer/restore)
+  grip: 7, // trailing drag-handle glyph (flush, hugs the edge)
   gap: 6,
   padding: 8, // along the long axis, each side
   border: 1, // each side
 };
 
 /**
- * Long-axis length (logical px) for a mini bar holding the status dot plus
- * `buttons` action buttons. Layout: [pad][dot](gap[button])×buttons[pad],
- * plus borders. Lets the bar hug its content instead of using a fixed width.
+ * Long-axis length (logical px) for a mini bar holding the leading status
+ * dot, `actionButtons` 20px buttons, and the trailing grip handle.
+ * Layout: [pad][dot](gap[button])×actionButtons(gap[grip])[pad] + borders.
+ * Lets the bar hug its content instead of using a fixed width.
  */
-export function miniBarLength(buttons: number): number {
+export function miniBarLength(actionButtons: number): number {
   const g = MINI_BAR;
-  return 2 * g.border + 2 * g.padding + g.dot + buttons * (g.gap + g.button);
+  return (
+    2 * g.border +
+    2 * g.padding +
+    g.dot +
+    actionButtons * (g.gap + g.button) +
+    (g.gap + g.grip)
+  );
 }
 
 export const DEFAULT_MARGINS: SnapMargins = { edge: 8, menuBar: 30 };

@@ -43,15 +43,14 @@ export function useMiniMode(scale: number) {
   const [edge, setEdge] = useState<Edge>("bottom");
   const savedPetPosRef = useRef<LogicalPosition | null>(null);
 
-  // Size the bar to hug its content: dot + restore + grip handle + whichever
-  // tools are enabled (must match which elements MiniBar actually renders).
+  // Size the bar to hug its content. miniBarLength already includes the
+  // leading dot and trailing grip; here we count only the 20px action
+  // buttons (restore + whichever tools are enabled).
   const { enabled: sessionListEnabled } = useSessionList();
   const { enabled: lanListEnabled } = useLanList();
-  const barButtons =
-    2 /* restore + grip */ +
-    (sessionListEnabled ? 1 : 0) +
-    (lanListEnabled ? 1 : 0);
-  const barLongLogical = miniBarLength(barButtons);
+  const actionButtons =
+    1 /* restore */ + (sessionListEnabled ? 1 : 0) + (lanListEnabled ? 1 : 0);
+  const barLongLogical = miniBarLength(actionButtons);
 
   const snapToNearest = useCallback(async () => {
     const win = getCurrentWindow();
