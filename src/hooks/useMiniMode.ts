@@ -22,9 +22,9 @@ import {
 
 export type Mode = "pet" | "mini";
 
-/** Edge gaps for the docked bar: hug the screen edge (2px), but keep enough
- *  top clearance to sit just below the macOS menu bar. */
-const MINI_MARGINS: SnapMargins = { edge: 2, menuBar: 28 };
+/** Edge gaps for the docked bar: flush against the screen edge (0px), but keep
+ *  enough top clearance to sit just below the macOS menu bar. */
+const MINI_MARGINS: SnapMargins = { edge: 0, menuBar: 28 };
 
 /** Convert a Tauri Monitor (physical px) to a logical-px rect, the same space
  *  as event.screenX/Y and Tauri's LogicalPosition (setPosition). */
