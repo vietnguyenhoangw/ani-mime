@@ -53,7 +53,7 @@ describe("computeSnap", () => {
     expect(DEFAULT_MARGINS.menuBar).toBeGreaterThanOrEqual(DEFAULT_MARGINS.edge);
     expect(DEFAULT_MARGINS).toEqual({ edge: 8, menuBar: 30 });
     expect(BAR_LONG).toBe(168);
-    expect(BAR_SHORT).toBe(40);
+    expect(BAR_SHORT).toBe(28);
   });
 
   it("snaps to the LEFT edge on a secondary monitor with negative origin", () => {

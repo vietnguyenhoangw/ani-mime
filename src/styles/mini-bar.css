@@ -38,7 +38,12 @@
 /* Mini-bar tool buttons reuse the status-pill button styling
    (.pill-action-btn / .pill-action-icon, defined in status-pill.css)
    so hover fill, press animation, icon opacity, and active/has-peers
-   highlights are identical to the pet-mode pill. */
+   highlights are identical to the pet-mode pill — but smaller, so the
+   docked bar stays compact (the pet pill keeps its 20px buttons). */
+.mini-bar .pill-action-btn {
+  width: 16px;
+  height: 16px;
+}
 
 /* Drag handle (6-dot grip). The ONLY element that moves the bar — see
    useDrag({ requireHandle: true }). Pressing anywhere else does nothing. */
