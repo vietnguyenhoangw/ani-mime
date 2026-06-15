@@ -440,7 +440,6 @@ function App() {
           status={status}
           orientation={mini.orientation}
           edge={mini.edge}
-          snapToNearest={mini.snapToNearest}
           onGripMouseDown={mini.startEdgeDrag}
           onRestore={mini.exitMini}
         />

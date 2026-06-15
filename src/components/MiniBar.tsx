@@ -1,69 +1,47 @@
-import { useRef, useState, useEffect } from "react";
-import {
-  getCurrentWindow,
-  currentMonitor,
-  LogicalPosition,
-  LogicalSize,
-} from "@tauri-apps/api/window";
+import { useState, useEffect } from "react";
+import { getCurrentWindow, LogicalPosition } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { listen } from "@tauri-apps/api/event";
 import type { Status } from "../types/status";
 import type { Orientation, Edge } from "../utils/snap";
 import { inwardPopoverPos } from "../utils/popoverPos";
-import { fetchSessions } from "../hooks/useSessions";
-import {
-  groupSessions,
-  detectHome,
-  reflectActiveServices,
-  overlayClaudeState,
-  type Group,
-} from "../utils/sessionGroups";
 import { useSessionList } from "../hooks/useSessionList";
 import { useLanList } from "../hooks/useLanList";
-import { useCollapsedSessionGroups } from "../hooks/useCollapsedSessionGroups";
 import { usePeers } from "../hooks/usePeers";
 import { useSoundSettings } from "../hooks/useSoundSettings";
 import { playAudio } from "../utils/audio";
-import { SessionDropdown } from "./SessionDropdown";
 import "../styles/mini-bar.css";
 import "../styles/status-pill.css";
 
-/** Peer-list popover window size — must match tauri.conf.json. */
+/** Tool-window sizes — must match the window defs in tauri.conf.json. */
 const PEER_W = 280;
 const PEER_H = 260;
+const SESSION_W = 280;
+const SESSION_H = 360;
 const POPOVER_GAP = 8;
-
-/** Mini-mode session panel size (logical px) when the list is open. */
-const PANEL_W = 320;
-const PANEL_LIST_H = 360;
-const PANEL_HEADER_H = 40;
 
 interface MiniBarProps {
   status: Status;
   orientation: Orientation;
   edge: Edge;
-  snapToNearest: () => void;
-  /** mousedown on the grip — starts the edge-constrained drag. */
+  /** mousedown on the grip — starts the drag. */
   onGripMouseDown: (e: React.MouseEvent) => void;
   onRestore: () => void;
 }
 
-export function MiniBar({ status, orientation, edge, snapToNearest, onGripMouseDown, onRestore }: MiniBarProps) {
-  // Tracks the session panel's previous open state so we only snap the bar
-  // back when the panel actually closes — NOT on orientation changes, which
-  // would otherwise interrupt the magnet glide mid-flight.
-  const prevSessionOpenRef = useRef(false);
-
+/**
+ * The collapsed mini bar. In mini mode each tool (session list, peers) opens
+ * its OWN window docked inward from the bar — never an inline list/panel. (Pet
+ * mode keeps the inline dropdown in StatusPill.)
+ */
+export function MiniBar({ status, orientation, edge, onGripMouseDown, onRestore }: MiniBarProps) {
   const { enabled: sessionListEnabled } = useSessionList();
   const { enabled: lanListEnabled } = useLanList();
-  // Mirrors StatusPill: the peer popover is unavailable while visiting
-  // (you can't start a second visit). The session list stays available.
+  // Mirrors StatusPill: the peer tool is unavailable while visiting (you can't
+  // start a second visit). The session list stays available.
   const peerDisabled = status === "visiting";
-  const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
   const peers = usePeers();
   const [sessionOpen, setSessionOpen] = useState(false);
   const [peerOpen, setPeerOpen] = useState(false);
-  const [groups, setGroups] = useState<Group[]>([]);
 
   // UI click feedback, gated by the master sound toggle — same as StatusPill.
   const soundSettings = useSoundSettings();
@@ -71,133 +49,15 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onGripMouseD
     if (soundSettings.master) playAudio("tap");
   };
 
-  const toggleSession = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!sessionListEnabled) return;
-    playClickTap();
-    if (sessionOpen) {
-      setSessionOpen(false);
-      return;
-    }
-    // Only one popover at a time — hide the peer popover before opening.
-    // Guarded so a popover lookup failure never blocks opening the list.
-    try {
-      const popover = await WebviewWindow.getByLabel("peer-list");
-      if (popover && (await popover.isVisible())) {
-        await popover.hide().catch(() => {});
-        setPeerOpen(false);
-      }
-    } catch {
-      /* peer window unavailable — ignore */
-    }
-    const list = await fetchSessions();
-    setGroups(groupSessions(overlayClaudeState(reflectActiveServices(list)), detectHome(list)));
-    setSessionOpen(true);
+  const hideToolWindow = async (label: string) => {
+    const win = await WebviewWindow.getByLabel(label);
+    await win?.hide().catch(() => {});
   };
 
-  // Live refresh while open.
-  useEffect(() => {
-    if (!sessionOpen) return;
-    let cancelled = false;
-    const refresh = async () => {
-      const list = await fetchSessions();
-      if (cancelled) return;
-      setGroups(groupSessions(overlayClaudeState(reflectActiveServices(list)), detectHome(list)));
-    };
-    const unlistenP = listen("sessions-changed", () => void refresh());
-    return () => {
-      cancelled = true;
-      unlistenP.then((fn) => fn());
-    };
-  }, [sessionOpen]);
-
-  // Grow the bar window into a panel while the list is open.
-  // On close, re-snap (which resizes the window back to the bar).
-  useEffect(() => {
-    if (!sessionOpen) {
-      // Only restore the bar size when the panel was just open (panel→bar).
-      // Orientation changes while closed come from a snap that already
-      // positioned the bar, so don't re-snap here.
-      if (prevSessionOpenRef.current) {
-        prevSessionOpenRef.current = false;
-        snapToNearest();
-      }
-      return;
-    }
-    prevSessionOpenRef.current = true;
-    const vertical = orientation === "vertical";
-    const w = PANEL_W;
-    const h = vertical ? PANEL_LIST_H : PANEL_HEADER_H + PANEL_LIST_H;
-    void (async () => {
-      const win = getCurrentWindow();
-      try {
-        const sf = await win.scaleFactor();
-        const pos = (await win.outerPosition()).toLogical(sf);
-        let x = pos.x;
-        let y = pos.y;
-        const mon = await currentMonitor();
-        if (mon) {
-          const msf = mon.scaleFactor || 1;
-          const mx = mon.position.x / msf;
-          const my = mon.position.y / msf;
-          const mw = mon.size.width / msf;
-          const mh = mon.size.height / msf;
-          // Clamp so the whole panel stays on-screen (expands inward
-          // from whichever edge/corner the bar is snapped to).
-          x = Math.min(Math.max(x, mx + 8), mx + mw - w - 8);
-          y = Math.min(Math.max(y, my + 8), my + mh - h - 8);
-        }
-        await win.setSize(new LogicalSize(w, h));
-        await win.setPosition(new LogicalPosition(x, y));
-      } catch (err) {
-        console.error("[mini-bar] panel grow failed:", err);
-      }
-    })();
-  }, [sessionOpen, orientation]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Keep the peer popover hidden when the LAN list is turned off or while
-  // visiting — mirrors StatusPill so the two modes behave identically.
-  useEffect(() => {
-    if (lanListEnabled && !peerDisabled) return;
-    void (async () => {
-      const popover = await WebviewWindow.getByLabel("peer-list");
-      await popover?.hide().catch(() => {});
-    })();
-    setPeerOpen(false);
-  }, [lanListEnabled, peerDisabled]);
-
-  // Reset the active-state highlight when the popover loses focus (e.g. the
-  // user clicks elsewhere) — same pattern as StatusPill.
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    (async () => {
-      const popover = await WebviewWindow.getByLabel("peer-list");
-      if (!popover) return;
-      const fn = await popover.onFocusChanged(({ payload: focused }) => {
-        if (!focused) setPeerOpen(false);
-      });
-      unlisten = fn;
-    })();
-    return () => {
-      unlisten?.();
-    };
-  }, []);
-
-  const togglePeer = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!lanListEnabled || peerDisabled) return;
-    playClickTap();
-    const popover = await WebviewWindow.getByLabel("peer-list");
-    if (!popover) return;
-    if (await popover.isVisible()) {
-      await popover.hide();
-      setPeerOpen(false);
-      return;
-    }
-    // Only one popover at a time — close the session list before showing.
-    if (sessionOpen) setSessionOpen(false);
+  /** Show a tool window docked inward from the bar's snapped edge. */
+  const showToolWindow = async (label: string, w: number, h: number) => {
+    const win = await WebviewWindow.getByLabel(label);
+    if (!win) return false;
     const main = getCurrentWindow();
     const sf = await main.scaleFactor();
     const pos = (await main.outerPosition()).toLogical(sf);
@@ -205,15 +65,88 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onGripMouseD
     const p = inwardPopoverPos(
       { x: pos.x, y: pos.y, width: size.width, height: size.height },
       edge,
-      PEER_W,
-      PEER_H,
+      w,
+      h,
       POPOVER_GAP
     );
-    await popover.setPosition(new LogicalPosition(p.x, p.y));
-    await popover.show();
-    await popover.setFocus();
-    setPeerOpen(true);
+    await win.setPosition(new LogicalPosition(p.x, p.y));
+    await win.show();
+    await win.setFocus();
+    return true;
   };
+
+  const toggleSession = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!sessionListEnabled) return;
+    playClickTap();
+    const win = await WebviewWindow.getByLabel("session-list");
+    if (win && (await win.isVisible())) {
+      await win.hide();
+      setSessionOpen(false);
+      return;
+    }
+    // Only one tool window open at a time.
+    if (peerOpen) {
+      await hideToolWindow("peer-list");
+      setPeerOpen(false);
+    }
+    if (await showToolWindow("session-list", SESSION_W, SESSION_H)) {
+      setSessionOpen(true);
+    }
+  };
+
+  const togglePeer = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!lanListEnabled || peerDisabled) return;
+    playClickTap();
+    const win = await WebviewWindow.getByLabel("peer-list");
+    if (win && (await win.isVisible())) {
+      await win.hide();
+      setPeerOpen(false);
+      return;
+    }
+    if (sessionOpen) {
+      await hideToolWindow("session-list");
+      setSessionOpen(false);
+    }
+    if (await showToolWindow("peer-list", PEER_W, PEER_H)) {
+      setPeerOpen(true);
+    }
+  };
+
+  // Hide the peer window when the LAN list is turned off or while visiting.
+  useEffect(() => {
+    if (lanListEnabled && !peerDisabled) return;
+    void hideToolWindow("peer-list");
+    setPeerOpen(false);
+  }, [lanListEnabled, peerDisabled]);
+
+  // Reset a tool button's active highlight when its window loses focus (the
+  // window hides itself on blur; this just keeps the button state in sync).
+  useEffect(() => {
+    const unsubs: Array<() => void> = [];
+    void (async () => {
+      const peer = await WebviewWindow.getByLabel("peer-list");
+      if (peer) {
+        unsubs.push(
+          await peer.onFocusChanged(({ payload }) => {
+            if (!payload) setPeerOpen(false);
+          })
+        );
+      }
+      const sess = await WebviewWindow.getByLabel("session-list");
+      if (sess) {
+        unsubs.push(
+          await sess.onFocusChanged(({ payload }) => {
+            if (!payload) setSessionOpen(false);
+          })
+        );
+      }
+    })();
+    return () => unsubs.forEach((fn) => fn());
+  }, []);
 
   return (
     <div
@@ -293,18 +226,6 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onGripMouseD
           <circle cx="3.9" cy="9.9" r="1.1" />
         </svg>
       </span>
-
-      {sessionOpen && (
-        <SessionDropdown
-          groups={groups}
-          collapsed={collapsed}
-          toggleCollapsed={(key) => void toggleCollapsed(key)}
-          onPickSession={() => setSessionOpen(false)}
-          style={{ position: "static", transform: "none", left: "auto", maxHeight: `${PANEL_LIST_H}px`, width: "100%" }}
-          showPathTooltip={() => {}}
-          hidePathTooltip={() => {}}
-        />
-      )}
     </div>
   );
 }
