@@ -258,6 +258,11 @@ export function SessionListApp() {
         data-testid="session-list-root"
         role="menu"
       >
+        <header className="session-list-header">
+          <h1>Sessions</h1>
+          <p className="sub">Click a terminal to bring it to the front.</p>
+        </header>
+        <div className="session-list-body">
         {groups.length === 0 ? (
           <div className="session-empty">No active terminals</div>
         ) : (
@@ -345,6 +350,7 @@ export function SessionListApp() {
             );
           })
         )}
+        </div>
       </div>
 
       {pathTooltip &&

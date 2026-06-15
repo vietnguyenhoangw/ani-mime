@@ -1,7 +1,19 @@
-/* Styles for the `session-list` Tauri popover window. The window itself
-   is transparent + decoration-less; the .session-list-shell wrapper adds
-   12px of padding on all sides so the card's box-shadow isn't clipped
-   by the window edge (offsetWidth/Height does NOT include box-shadow). */
+/* Styles for the `session-list` Tauri window — a modal dialog matching the
+   clipboard-manager plugin (opaque solid surface + header), while keeping the
+   original session list item styling below. The window is transparent +
+   decoration-less; .session-list-shell pads 12px so the card's shadow isn't
+   clipped by the window edge. */
+
+/* Opaque modal surface, mirroring the clipboard plugin palette. */
+:root,
+[data-theme="dark"] {
+  --sl-surface: #1e1e22;
+  --sl-muted: rgba(242, 242, 244, 0.55);
+}
+[data-theme="light"] {
+  --sl-surface: #f5f5f7;
+  --sl-muted: rgba(29, 29, 31, 0.55);
+}
 
 html,
 body,
@@ -23,13 +35,14 @@ body,
 .session-list-root {
   min-width: 240px;
   max-width: 360px;
-  padding: 4px;
-  border-radius: 10px;
-  background: var(--bg-pill);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 12px;
+  background: var(--sl-surface);
   border: 1px solid var(--border-pill);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   color: var(--text-primary);
   animation: session-list-fade-in 0.1s ease-out;
@@ -38,6 +51,33 @@ body,
 @keyframes session-list-fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
+}
+
+/* --- Modal header (title + subtitle), like the clipboard manager --- */
+.session-list-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-list-header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.session-list-header .sub {
+  margin: 0;
+  font-size: 11px;
+  color: var(--sl-muted);
+}
+
+/* List body scrolls inside the dialog when there are many sessions. */
+.session-list-body {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .session-empty {
