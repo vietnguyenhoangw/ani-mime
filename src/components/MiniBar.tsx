@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import {
   getCurrentWindow,
+  currentMonitor,
   LogicalPosition,
   LogicalSize,
 } from "@tauri-apps/api/window";
@@ -21,6 +22,7 @@ import { useSessionList } from "../hooks/useSessionList";
 import { useCollapsedSessionGroups } from "../hooks/useCollapsedSessionGroups";
 import { SessionDropdown } from "./SessionDropdown";
 import "../styles/mini-bar.css";
+import "../styles/status-pill.css";
 
 /** Peer-list popover window size — must match tauri.conf.json. */
 const PEER_W = 280;
@@ -41,7 +43,6 @@ interface MiniBarProps {
 }
 
 export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }: MiniBarProps) {
-  const lanButtonRef = useRef<HTMLButtonElement>(null);
   const didMountRef = useRef(false);
 
   const { enabled: sessionListEnabled } = useSessionList();
@@ -90,7 +91,31 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
     const vertical = orientation === "vertical";
     const w = PANEL_W;
     const h = vertical ? PANEL_LIST_H : PANEL_HEADER_H + PANEL_LIST_H;
-    void getCurrentWindow().setSize(new LogicalSize(w, h)).catch(() => {});
+    void (async () => {
+      const win = getCurrentWindow();
+      try {
+        const sf = await win.scaleFactor();
+        const pos = (await win.outerPosition()).toLogical(sf);
+        let x = pos.x;
+        let y = pos.y;
+        const mon = await currentMonitor();
+        if (mon) {
+          const msf = mon.scaleFactor || 1;
+          const mx = mon.position.x / msf;
+          const my = mon.position.y / msf;
+          const mw = mon.size.width / msf;
+          const mh = mon.size.height / msf;
+          // Clamp so the whole panel stays on-screen (expands inward
+          // from whichever edge/corner the bar is snapped to).
+          x = Math.min(Math.max(x, mx + 8), mx + mw - w - 8);
+          y = Math.min(Math.max(y, my + 8), my + mh - h - 8);
+        }
+        await win.setSize(new LogicalSize(w, h));
+        await win.setPosition(new LogicalPosition(x, y));
+      } catch (err) {
+        console.error("[mini-bar] panel grow failed:", err);
+      }
+    })();
   }, [sessionOpen, orientation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePeer = async (e: React.MouseEvent) => {
@@ -143,7 +168,6 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
       )}
 
       <button
-        ref={lanButtonRef}
         type="button"
         data-testid="mini-bar-action-lan"
         className="mini-bar-btn"
@@ -175,7 +199,7 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
           collapsed={collapsed}
           toggleCollapsed={(key) => void toggleCollapsed(key)}
           onPickSession={() => setSessionOpen(false)}
-          style={{ position: "static", maxHeight: `${PANEL_LIST_H}px`, width: "100%" }}
+          style={{ position: "static", transform: "none", left: "auto", maxHeight: `${PANEL_LIST_H}px`, width: "100%" }}
           showPathTooltip={() => {}}
           hidePathTooltip={() => {}}
         />
