@@ -44,7 +44,8 @@
   width: auto;
   height: 100%;
   color: var(--text-primary);
-  opacity: 0.4;
+  /* Match the action icons (.pill-action-icon): 0.75 at rest, 1 on hover. */
+  opacity: 0.75;
   cursor: grab;
   -webkit-user-select: none;
   user-select: none;
@@ -52,7 +53,7 @@
 }
 
 .mini-bar-grip:hover {
-  opacity: 0.8;
+  opacity: 1;
 }
 
 .mini-bar-grip:active {
