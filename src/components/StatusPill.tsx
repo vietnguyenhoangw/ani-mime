@@ -423,8 +423,8 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange, onMin
             >
               <svg
                 className="pill-action-icon"
-                width="12"
-                height="12"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="currentColor"
                 aria-hidden="true"
