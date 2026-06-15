@@ -28,7 +28,7 @@ export interface SnapResult {
 
 /** Bar dimensions in logical px (before display scale). Long = along the edge. */
 export const BAR_LONG = 168;
-export const BAR_SHORT = 28;
+export const BAR_SHORT = 22;
 
 /**
  * Mini-bar layout geometry (logical px, before display scale).
@@ -41,7 +41,7 @@ export const MINI_BAR = {
   button: 16, // action buttons (session/peer/restore)
   grip: 5, // trailing drag-handle glyph (small, flush, hugs the edge)
   gap: 6,
-  padding: 4, // along the long axis, each side
+  padding: 8, // along the long axis, each side
   border: 1, // each side
 };
 

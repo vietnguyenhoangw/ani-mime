@@ -23,7 +23,7 @@
   width: 100%;
   height: 100%;
   box-sizing: border-box;
-  padding: 0 4px;
+  padding: 0 8px;
   border-radius: 20px;
   background: var(--bg-pill);
   border: 1px solid var(--border-pill);
@@ -32,7 +32,7 @@
 
 .mini-bar.vertical {
   flex-direction: column;
-  padding: 4px 0;
+  padding: 8px 0;
 }
 
 /* Mini-bar tool buttons reuse the status-pill button styling
