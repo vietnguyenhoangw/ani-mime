@@ -66,6 +66,30 @@ body,
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  /* Thin, subtle overlay scrollbar instead of the chunky default. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 120, 128, 0.4) transparent;
+}
+
+.session-list-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.session-list-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-list-body::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.4);
+  border-radius: 8px;
+  /* Inset the thumb so it reads as a slim pill, not a full-width bar. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.session-list-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 120, 128, 0.65);
+  background-clip: padding-box;
 }
 
 .session-empty {
