@@ -7,6 +7,7 @@ import {
   LogicalSize,
   type Monitor,
 } from "@tauri-apps/api/window";
+import { warn } from "@tauri-apps/plugin-log";
 import { getDefaultPetSize } from "./useWindowDefaultSize";
 import { useSessionList } from "./useSessionList";
 import { useLanList } from "./useLanList";
@@ -208,10 +209,10 @@ export function useMiniMode(scale: number) {
         x: e.screenX,
         y: e.screenY,
       };
+      let lastDock: { x: number; y: number; width: number; height: number } | null = null;
       let raf = 0;
       let curW = -1;
       let curH = -1;
-      let logged = false;
 
       const apply = () => {
         raf = 0;
@@ -226,14 +227,7 @@ export function useMiniMode(scale: number) {
           barShort,
           DEFAULT_MARGINS
         );
-        if (!logged) {
-          logged = true;
-          console.log("[mini-bar] drag dock", {
-            cursor: pending,
-            monitor,
-            dock,
-          });
-        }
+        lastDock = { x: dock.x, y: dock.y, width: dock.width, height: dock.height };
         setOrientation(dock.orientation);
         setEdge(dock.edge);
         if (dock.width !== curW || dock.height !== curH) {
@@ -253,6 +247,19 @@ export function useMiniMode(scale: number) {
         document.removeEventListener("mouseup", onUp);
         if (raf) cancelAnimationFrame(raf);
         apply(); // ensure the final position is committed
+        // DIAGNOSTIC: compare intended dock vs the window's actual placement.
+        void (async () => {
+          try {
+            const sf = await win.scaleFactor();
+            const actual = (await win.outerPosition()).toLogical(sf);
+            const size = (await win.outerSize()).toLogical(sf);
+            void warn(
+              `[mini-bar] DBG monitors=${JSON.stringify(monitors)} cursor=${JSON.stringify(pending)} sf=${sf} intended=${JSON.stringify(lastDock)} actualPos=${Math.round(actual.x)},${Math.round(actual.y)} actualSize=${Math.round(size.width)}x${Math.round(size.height)} screen=${window.screen.width}x${window.screen.height} dpr=${window.devicePixelRatio}`
+            );
+          } catch (err) {
+            void warn(`[mini-bar] DBG failed: ${String(err)}`);
+          }
+        })();
       };
 
       document.addEventListener("mousemove", onMove);
