@@ -19,6 +19,7 @@ import {
   type Group,
 } from "../utils/sessionGroups";
 import { useSessionList } from "../hooks/useSessionList";
+import { useLanList } from "../hooks/useLanList";
 import { useCollapsedSessionGroups } from "../hooks/useCollapsedSessionGroups";
 import { SessionDropdown } from "./SessionDropdown";
 import "../styles/mini-bar.css";
@@ -46,6 +47,10 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
   const didMountRef = useRef(false);
 
   const { enabled: sessionListEnabled } = useSessionList();
+  const { enabled: lanListEnabled } = useLanList();
+  // Mirrors StatusPill: the peer popover is unavailable while visiting
+  // (you can't start a second visit). The session list stays available.
+  const peerDisabled = status === "visiting";
   const { collapsed, toggle: toggleCollapsed } = useCollapsedSessionGroups();
   const [sessionOpen, setSessionOpen] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -118,9 +123,20 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
     })();
   }, [sessionOpen, orientation]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep the peer popover hidden when the LAN list is turned off or while
+  // visiting — mirrors StatusPill so the two modes behave identically.
+  useEffect(() => {
+    if (lanListEnabled && !peerDisabled) return;
+    void (async () => {
+      const popover = await WebviewWindow.getByLabel("peer-list");
+      await popover?.hide().catch(() => {});
+    })();
+  }, [lanListEnabled, peerDisabled]);
+
   const togglePeer = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!lanListEnabled || peerDisabled) return;
     const popover = await WebviewWindow.getByLabel("peer-list");
     if (!popover) return;
     if (await popover.isVisible()) {
@@ -167,18 +183,21 @@ export function MiniBar({ status, orientation, edge, snapToNearest, onRestore }:
         </button>
       )}
 
-      <button
-        type="button"
-        data-testid="mini-bar-action-lan"
-        className="mini-bar-btn"
-        aria-label="Mime Around You"
-        title="Peers nearby"
-        onClick={togglePeer}
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M9 2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2v3H5a1 1 0 0 0-1 1v1h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H6v-1h12v1h-1a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1h-2v-1a1 1 0 0 0-1-1h-6V9h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H9z" />
-        </svg>
-      </button>
+      {lanListEnabled && (
+        <button
+          type="button"
+          data-testid="mini-bar-action-lan"
+          className="mini-bar-btn"
+          aria-label="Mime Around You"
+          title="Peers nearby"
+          onClick={togglePeer}
+          disabled={peerDisabled}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M9 2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2v3H5a1 1 0 0 0-1 1v1h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H6v-1h12v1h-1a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1h-2v-1a1 1 0 0 0-1-1h-6V9h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H9z" />
+          </svg>
+        </button>
+      )}
 
       <button
         type="button"
