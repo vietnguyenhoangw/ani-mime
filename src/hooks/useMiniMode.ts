@@ -7,6 +7,7 @@ import {
   LogicalSize,
   type Monitor,
 } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { getDefaultPetSize } from "./useWindowDefaultSize";
 import { useSessionList } from "./useSessionList";
 import { useLanList } from "./useLanList";
@@ -214,12 +215,17 @@ export function useMiniMode(scale: number) {
       console.error("[mini-bar] capture pet position failed:", err);
     }
     setMode("mini");
+    // Make the window non-movable to the OS so macOS Sequoia won't tile it when
+    // it reaches a screen edge (we still move it via setPosition).
+    void invoke("set_window_movable", { movable: false }).catch(() => {});
     await snapToNearest();
   }, [snapToNearest]);
 
   const exitMini = useCallback(async () => {
     const win = getCurrentWindow();
     setMode("pet");
+    // Restore movability so the native pet drag works again.
+    void invoke("set_window_movable", { movable: true }).catch(() => {});
     try {
       const def = getDefaultPetSize(scale);
       await win.setSize(new LogicalSize(def.width, def.height));
