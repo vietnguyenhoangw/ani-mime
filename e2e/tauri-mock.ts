@@ -102,7 +102,13 @@ export const tauriMockScript = `
       const path = ridToPath.get(args.rid) || 'store.json';
       const store = getOrCreateStore(path);
       const val = store.get(args.key);
-      return val !== undefined ? [val] : null;
+      // plugin-store v2 expects [value, exists] tuple
+      return val !== undefined ? [val, true] : [undefined, false];
+    }
+    if (cmd === 'plugin:store|has') {
+      const path = ridToPath.get(args.rid) || 'store.json';
+      const store = getOrCreateStore(path);
+      return store.has(args.key);
     }
     if (cmd === 'plugin:store|set') {
       const path = ridToPath.get(args.rid) || 'store.json';
@@ -178,8 +184,22 @@ export const tauriMockScript = `
     // Log plugin  ---------------------------------------------------------
     if (cmd === 'plugin:log|log') return null;
 
+    // Window plugin — additional stubs needed by App.tsx
+    if (cmd === 'plugin:window|scale_factor') return 1;
+    if (cmd === 'plugin:window|set_position') return null;
+    if (cmd === 'plugin:window|current_monitor') return {
+      name: 'mock',
+      scaleFactor: 1,
+      position: { x: 0, y: 0 },
+      size: { width: 1440, height: 900 },
+    };
+    if (cmd === 'plugin:window|get_all_windows') return [{ label: 'main' }];
+    if (cmd === 'plugin:window|is_visible') return false;
+
     // Custom app commands
     if (cmd === 'start_visit') return null;
+    if (cmd === 'get_sessions') return window.__MOCK_SESSIONS__ ?? [];
+    if (cmd === 'get_peers')    return window.__MOCK_PEERS__   ?? [];
 
     // Plugin manager commands
     if (cmd === 'get_plugins') {
