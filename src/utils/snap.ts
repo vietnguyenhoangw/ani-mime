@@ -41,7 +41,7 @@ export const MINI_BAR = {
   button: 16, // action buttons (session/peer/restore)
   grip: 5, // trailing drag-handle glyph (small, flush, hugs the edge)
   gap: 6,
-  padding: 8, // along the long axis, each side
+  padding: 4, // along the long axis, each side
   border: 1, // each side
 };
 
