@@ -35,6 +35,11 @@ interface StatusPillProps {
    * window while the fixed-positioned dropdown is visible.
    */
   onOpenChange?: (open: boolean) => void;
+  /**
+   * When provided, renders a minimize button that collapses the pet into
+   * mini-bar mode. Omitted in contexts where minimizing isn't allowed.
+   */
+  onMinimize?: () => void;
 }
 
 const dotClassMap: Record<Status, string> = {
@@ -225,7 +230,7 @@ async function computePopoverScreenPos(
   return new LogicalPosition(Math.round(left), Math.round(top));
 }
 
-export function StatusPill({ status, glow, disabled = false, onOpenChange }: StatusPillProps) {
+export function StatusPill({ status, glow, disabled = false, onOpenChange, onMinimize }: StatusPillProps) {
   // --- Session list state ---
   const [sessionOpen, setSessionOpen] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -481,6 +486,32 @@ export function StatusPill({ status, glow, disabled = false, onOpenChange }: Sta
         </span>
 
         <div className="pill-actions" data-testid="pill-actions">
+          {onMinimize && (
+            <button
+              type="button"
+              data-testid="pill-action-minimize"
+              className="pill-action-btn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                playClickTap();
+                onMinimize();
+              }}
+              aria-label="Minimize to bar"
+              title="Minimize to bar"
+            >
+              <svg
+                className="pill-action-icon"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M6 19h12v2H6z" />
+              </svg>
+            </button>
+          )}
           {sessionListEnabled && (
             <button
               type="button"

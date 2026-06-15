@@ -3,6 +3,19 @@
  */
 import "@testing-library/jest-dom";
 
+// jsdom does not implement HTMLMediaElement.play/pause — stub them so
+// components that call playAudio() (e.g. StatusPill) don't throw.
+Object.defineProperty(HTMLMediaElement.prototype, "play", {
+  configurable: true,
+  writable: true,
+  value: () => Promise.resolve(),
+});
+Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+  configurable: true,
+  writable: true,
+  value: () => undefined,
+});
+
 import { resetMocks as resetTauri } from "./tauri";
 import { resetMocks as resetEvent } from "./tauri-event";
 import { resetMocks as resetMenu } from "./tauri-menu";

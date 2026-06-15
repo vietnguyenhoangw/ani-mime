@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { StatusPill } from "../../components/StatusPill";
 import type { Status } from "../../types/status";
 
@@ -57,5 +57,18 @@ describe("StatusPill", () => {
     const { container } = render(<StatusPill status="idle" />);
     const pill = container.querySelector(".pill");
     expect(pill).not.toHaveClass("neon-busy");
+  });
+
+  it("renders a minimize button and calls onMinimize when clicked", () => {
+    const onMinimize = vi.fn();
+    render(<StatusPill status="idle" onMinimize={onMinimize} />);
+    const btn = screen.getByTestId("pill-action-minimize");
+    fireEvent.click(btn);
+    expect(onMinimize).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not render a minimize button when onMinimize is omitted", () => {
+    render(<StatusPill status="idle" />);
+    expect(screen.queryByTestId("pill-action-minimize")).toBeNull();
   });
 });
