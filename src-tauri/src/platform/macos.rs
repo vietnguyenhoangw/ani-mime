@@ -259,3 +259,49 @@ end tell"#;
         .arg(script)
         .spawn();
 }
+
+/// Curated list of browser bundle ids → display names probed at enumeration
+/// time. Names are hardcoded so we never need LaunchServices name resolution.
+const BROWSER_CANDIDATES: &[(&str, &str)] = &[
+    ("com.apple.Safari", "Safari"),
+    ("com.google.Chrome", "Google Chrome"),
+    ("com.google.Chrome.canary", "Chrome Canary"),
+    ("org.mozilla.firefox", "Firefox"),
+    ("com.microsoft.edgemac", "Microsoft Edge"),
+    ("company.thebrowser.Browser", "Arc"),
+    ("com.brave.Browser", "Brave"),
+    ("com.operasoftware.Opera", "Opera"),
+    ("com.vivaldi.Vivaldi", "Vivaldi"),
+];
+
+/// Return `(bundle_id, display_name)` for each candidate browser actually
+/// installed, detected via Spotlight. Best-effort: if `mdfind` fails the
+/// candidate is treated as absent.
+pub fn list_browsers() -> Vec<(String, String)> {
+    BROWSER_CANDIDATES
+        .iter()
+        .filter(|(id, _)| bundle_installed(id))
+        .map(|(id, name)| (id.to_string(), name.to_string()))
+        .collect()
+}
+
+fn bundle_installed(bundle_id: &str) -> bool {
+    let query = format!("kMDItemCFBundleIdentifier == '{}'", bundle_id);
+    match std::process::Command::new("mdfind").arg(&query).output() {
+        Ok(out) => !out.stdout.is_empty(),
+        Err(_) => false,
+    }
+}
+
+/// Open `url` in the browser with `bundle_id`, or the OS default when `None`.
+/// The URL is passed as a separate argument (no shell), so it cannot inject.
+pub fn open_url_in(bundle_id: Option<&str>, url: &str) {
+    let mut cmd = std::process::Command::new("open");
+    if let Some(id) = bundle_id {
+        cmd.arg("-b").arg(id);
+    }
+    cmd.arg(url);
+    if let Err(e) = cmd.spawn() {
+        crate::app_error!("[platform] open url in browser failed: {}", e);
+    }
+}

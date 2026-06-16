@@ -60,6 +60,11 @@ pub const ANI_SDK_JS: &str = r#"
     },
     selection: {
       read: function () { return invoke('selection', 'read'); }
+    },
+    browser: {
+      list:       function () { return invoke('browser', 'list'); },
+      open:       function (url, bundleId) { return invoke('browser', 'open', { url: url, bundleId: bundleId }); },
+      setHotkeys: function (bundleId, bindings) { return invoke('browser', 'setHotkeys', { bundleId: bundleId, bindings: bindings }); }
     }
   };
 
@@ -210,5 +215,12 @@ mod tests {
     fn sdk_script_exposes_selection_namespace() {
         assert!(ANI_SDK_JS.contains("selection:"));
         assert!(ANI_SDK_JS.contains("invoke('selection', 'read')"));
+    }
+
+    #[test]
+    fn sdk_script_exposes_browser_namespace() {
+        assert!(ANI_SDK_JS.contains("browser:"));
+        assert!(ANI_SDK_JS.contains("setHotkeys"));
+        assert!(ANI_SDK_JS.contains("invoke('browser', 'list')"));
     }
 }

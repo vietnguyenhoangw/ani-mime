@@ -6,12 +6,14 @@ mod linux;
 
 #[cfg(target_os = "macos")]
 pub use macos::{
-    open_local_network_settings, open_path, open_url, run_update_command,
-    set_dock_visibility, set_window_movable, setup_main_window, show_choose_list, show_dialog,
+    list_browsers, open_local_network_settings, open_path, open_url, open_url_in,
+    run_update_command, set_dock_visibility, set_window_movable, setup_main_window,
+    show_choose_list, show_dialog,
 };
 
 #[cfg(target_os = "linux")]
 pub use linux::{
-    open_local_network_settings, open_path, open_url, run_update_command,
-    set_dock_visibility, set_window_movable, setup_main_window, show_choose_list, show_dialog,
+    list_browsers, open_local_network_settings, open_path, open_url, open_url_in,
+    run_update_command, set_dock_visibility, set_window_movable, setup_main_window,
+    show_choose_list, show_dialog,
 };

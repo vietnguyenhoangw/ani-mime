@@ -461,6 +461,15 @@ fn install_plugin_from_dialog(app: tauri::AppHandle) -> Result<plugin::PluginRec
     let _ = app.emit("plugins-changed", ());
     crate::app_log!("[plugin] installed {} v{}", manifest.id, manifest.version);
     plugin::hotkey::register_record(&app, &record);
+    // Re-arm persisted URL-hotkeys (plugin data now survives reinstall), so a
+    // browser-plugin's global item-hotkeys work immediately after reinstall
+    // without waiting for an app restart or opening the window.
+    if record.enabled && record.manifest.capabilities.iter().any(|c| c == "browser") {
+        let hk = plugin::browser::load(&manifest.id);
+        if !hk.bindings.is_empty() {
+            let _ = plugin::browser::register(&app, &hk);
+        }
+    }
     Ok(record)
 }
 
@@ -481,6 +490,7 @@ fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
         .ok()
         .and_then(|g| g.plugins.get(&id).and_then(plugin::hotkey::manifest_hotkey));
 
+    plugin::browser::unregister_plugin(&app, &id);
     plugin::loader::uninstall_plugin(&id, &root).map_err(|e| e.to_string())?;
 
     {
@@ -502,12 +512,14 @@ fn set_ani_plugin_enabled(
     enabled: bool,
 ) -> Result<(), String> {
     let state = app.state::<Arc<Mutex<AppState>>>();
-    let hotkey = {
+    let (hotkey, declares_browser) = {
         let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
         match guard.plugins.get_mut(&id) {
             Some(rec) => {
                 rec.enabled = enabled;
-                plugin::hotkey::manifest_hotkey(rec)
+                let hk = plugin::hotkey::manifest_hotkey(rec);
+                let db = rec.manifest.capabilities.iter().any(|c| c == "browser");
+                (hk, db)
             }
             None => return Err(format!("plugin '{}' not installed", id)),
         }
@@ -517,12 +529,21 @@ fn set_ani_plugin_enabled(
         if let Some(hk) = &hotkey {
             plugin::hotkey::register(&app, &id, hk);
         }
+        // Re-register persisted URL-hotkeys for this plugin (only if it
+        // declares the `browser` capability).
+        if declares_browser {
+            let hk = plugin::browser::load(&id);
+            if !hk.bindings.is_empty() {
+                let _ = plugin::browser::register(&app, &hk);
+            }
+        }
     } else {
         // Disabling unregisters the hotkey and closes any open window
         // (enabling is otherwise lazy — launch on demand).
         if let Some(hk) = &hotkey {
             plugin::hotkey::unregister(&app, hk);
         }
+        plugin::browser::unregister_plugin(&app, &id);
         let label = plugin::runtime::webview_label_for_id(&id);
         if let Some(win) = app.get_webview_window(&label) {
             let _ = win.close();
@@ -549,16 +570,15 @@ fn get_plugins(app: tauri::AppHandle) -> Vec<plugin::PluginRecord> {
     out
 }
 
-/// Reassign a plugin's launch hotkey. Persists the override (without touching
-/// the plugin's own manifest.json) and re-registers the global shortcut.
-/// Returns an error (keeping the previous hotkey) if the accelerator is
-/// invalid or already taken.
+/// Reassign (or clear) a plugin's launch hotkey. Persists the override (without
+/// touching the plugin's own manifest.json) and re-registers the global shortcut.
+/// An empty `hotkey` clears the launch shortcut entirely (the plugin keeps any
+/// other hotkeys, e.g. per-item ones, and can still be launched from the Plugin
+/// Manager). Returns an error (keeping the previous hotkey) if a non-empty
+/// accelerator is invalid or already taken.
 #[tauri::command]
 fn set_plugin_hotkey(app: tauri::AppHandle, id: String, hotkey: String) -> Result<(), String> {
     let accel = hotkey.trim().to_string();
-    if accel.is_empty() {
-        return Err("hotkey is empty".into());
-    }
 
     let state = app.state::<Arc<Mutex<AppState>>>();
     let (old, enabled) = {
@@ -570,11 +590,12 @@ fn set_plugin_hotkey(app: tauri::AppHandle, id: String, hotkey: String) -> Resul
         (plugin::hotkey::manifest_hotkey(rec), rec.enabled)
     };
 
-    // Drop the old binding, then try the new one (only meaningful while enabled).
+    // Drop the old binding, then (for a non-empty accelerator) try the new one.
+    // An empty accelerator just clears the launch hotkey — no re-register.
     if let Some(o) = &old {
         plugin::hotkey::unregister(&app, o);
     }
-    if enabled {
+    if !accel.is_empty() && enabled {
         if let Err(e) = plugin::hotkey::try_register(&app, &id, &accel) {
             // Restore the previous binding on failure.
             if let Some(o) = &old {
@@ -587,12 +608,16 @@ fn set_plugin_hotkey(app: tauri::AppHandle, id: String, hotkey: String) -> Resul
     {
         let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
         if let Some(rec) = guard.plugins.get_mut(&id) {
-            rec.manifest.hotkey = Some(accel.clone());
+            rec.manifest.hotkey = if accel.is_empty() { None } else { Some(accel.clone()) };
         }
     }
     plugin::hotkey::save_override(&id, &accel);
     let _ = app.emit("plugins-changed", ());
-    crate::app_log!("[hotkey] reassigned {} -> {}", id, accel);
+    if accel.is_empty() {
+        crate::app_log!("[hotkey] cleared launch hotkey for {}", id);
+    } else {
+        crate::app_log!("[hotkey] reassigned {} -> {}", id, accel);
+    }
     Ok(())
 }
 
@@ -840,6 +865,7 @@ pub fn run() {
                     crate::app_log!("[plugin] startup scan: {} installed", count);
                     if let Ok(guard) = app_state.lock() {
                         plugin::hotkey::register_enabled(app.handle(), &guard.plugins);
+                        plugin::browser::register_all_enabled(app.handle(), &guard.plugins);
                     }
                     let _ = app.emit("plugins-changed", ());
                 }

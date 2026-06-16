@@ -267,3 +267,13 @@ pub fn run_update_command(release_url: &str) {
     crate::app_log!("[platform] opening release page for manual upgrade: {}", release_url);
     open_url(release_url);
 }
+
+/// Linux v1 does not enumerate specific browsers — the picker is macOS-only.
+pub fn list_browsers() -> Vec<(String, String)> {
+    Vec::new()
+}
+
+/// Linux ignores `bundle_id` and opens in the OS default browser.
+pub fn open_url_in(_bundle_id: Option<&str>, url: &str) {
+    open_url(url);
+}
