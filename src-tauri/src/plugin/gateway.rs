@@ -157,6 +157,46 @@ pub fn plugin_call(
                 other => Err(format!("unknown translate method '{}'", other)),
             }
         }
+        "browser" => {
+            let app = window.app_handle();
+            match method.as_str() {
+                "list" => {
+                    let browsers: Vec<serde_json::Value> = crate::platform::list_browsers()
+                        .into_iter()
+                        .map(|(bundle_id, name)| {
+                            serde_json::json!({ "bundleId": bundle_id, "name": name })
+                        })
+                        .collect();
+                    Ok(serde_json::json!(browsers))
+                }
+                "open" => {
+                    let url = arg_str(&args, "url")?;
+                    if !crate::plugin::browser::is_allowed_url(&url) {
+                        return Err("url must be http(s)".into());
+                    }
+                    let bundle_id = args.get("bundleId").and_then(|v| v.as_str());
+                    crate::platform::open_url_in(bundle_id, &url);
+                    Ok(serde_json::Value::Null)
+                }
+                "setHotkeys" => {
+                    let browser_bundle_id = args
+                        .get("bundleId")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let bindings: Vec<crate::plugin::browser::Binding> = args
+                        .get("bindings")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok())
+                        .ok_or_else(|| "missing or invalid 'bindings' array".to_string())?;
+                    let hk = crate::plugin::browser::UrlHotkeys {
+                        browser_bundle_id,
+                        bindings,
+                    };
+                    let results = crate::plugin::browser::set_hotkeys(app, &id, hk);
+                    serde_json::to_value(results).map_err(|e| e.to_string())
+                }
+                other => Err(format!("unknown browser method '{}'", other)),
+            }
+        }
         other => Err(format!("unknown capability '{}'", other)),
     }
 }
@@ -265,5 +305,17 @@ mod tests {
         assert!(checked_window_size(100, 0).is_err());
         assert!(checked_window_size(99999, 100).is_err());
         assert_eq!(checked_window_size(480, 320).unwrap(), (480, 320));
+    }
+
+    #[test]
+    fn browser_capability_gating() {
+        let allowed = record(&["browser"], true);
+        assert!(capability_allowed(&allowed, "browser").is_ok());
+
+        let undeclared = record(&["window"], true);
+        assert!(capability_allowed(&undeclared, "browser").is_err());
+
+        let disabled = record(&["browser"], false);
+        assert!(capability_allowed(&disabled, "browser").is_err());
     }
 }
