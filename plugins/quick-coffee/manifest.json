@@ -1,0 +1,17 @@
+{
+  "id": "quick-coffee",
+  "name": "Quick Coffee",
+  "version": "0.1.0",
+  "description": "Assign a global hotkey to a website. Press it anywhere, your browser opens the page.",
+  "author": "ani-mime",
+  "entry": "index.html",
+  "hotkey": "CmdOrCtrl+Shift+K",
+  "capabilities": ["window", "browser", "storage"],
+  "window": {
+    "width": 560,
+    "height": 540,
+    "resizable": true,
+    "alwaysOnTop": true,
+    "decorations": true
+  }
+}
