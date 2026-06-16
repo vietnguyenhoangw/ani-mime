@@ -68,6 +68,115 @@ pub fn save(id: &str, hk: &UrlHotkeys) -> std::io::Result<()> {
     std::fs::write(&path, json)
 }
 
+use std::collections::HashMap;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+/// Register every binding in `hk` as a global shortcut that opens its URL in
+/// `hk.browser_bundle_id`. Returns a per-binding result so the UI can show
+/// conflicts. Duplicates within the set and non-http(s) URLs are rejected
+/// (reported, not registered). Existing bindings for the same accelerator are
+/// dropped first so re-registration is idempotent.
+pub fn register(app: &tauri::AppHandle, hk: &UrlHotkeys) -> Vec<BindingResult> {
+    let mut results = Vec::with_capacity(hk.bindings.len());
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+
+    for b in &hk.bindings {
+        let accel = b.accelerator.trim();
+        if accel.is_empty() {
+            results.push(BindingResult {
+                accelerator: b.accelerator.clone(),
+                ok: false,
+                error: Some("empty accelerator".into()),
+            });
+            continue;
+        }
+        if !seen.insert(accel) {
+            results.push(BindingResult {
+                accelerator: b.accelerator.clone(),
+                ok: false,
+                error: Some("duplicate accelerator in set".into()),
+            });
+            continue;
+        }
+        if !is_allowed_url(&b.url) {
+            results.push(BindingResult {
+                accelerator: b.accelerator.clone(),
+                ok: false,
+                error: Some("url must be http(s)".into()),
+            });
+            continue;
+        }
+
+        let _ = app.global_shortcut().unregister(accel);
+        let bundle = hk.browser_bundle_id.clone();
+        let url = b.url.clone();
+        let res = app.global_shortcut().on_shortcut(accel, move |_app, _sc, event| {
+            if event.state == ShortcutState::Pressed {
+                crate::platform::open_url_in(bundle.as_deref(), &url);
+            }
+        });
+        match res {
+            Ok(_) => {
+                crate::app_log!("[quick-coffee] bound {} -> {}", accel, b.url);
+                results.push(BindingResult {
+                    accelerator: b.accelerator.clone(),
+                    ok: true,
+                    error: None,
+                });
+            }
+            Err(e) => results.push(BindingResult {
+                accelerator: b.accelerator.clone(),
+                ok: false,
+                error: Some(e.to_string()),
+            }),
+        }
+    }
+    results
+}
+
+/// Unregister every accelerator currently persisted for plugin `id`
+/// (best-effort). Called on disable/uninstall and before re-registering.
+pub fn unregister_plugin(app: &tauri::AppHandle, id: &str) {
+    let hk = load(id);
+    for b in &hk.bindings {
+        let accel = b.accelerator.trim();
+        if accel.is_empty() {
+            continue;
+        }
+        if let Err(e) = app.global_shortcut().unregister(accel) {
+            crate::app_warn!("[quick-coffee] could not unregister {}: {}", accel, e);
+        }
+    }
+}
+
+/// Replace plugin `id`'s entire binding set: drop the old shortcuts, register
+/// the new ones, persist, and return per-binding results.
+pub fn set_hotkeys(app: &tauri::AppHandle, id: &str, hk: UrlHotkeys) -> Vec<BindingResult> {
+    unregister_plugin(app, id);
+    let results = register(app, &hk);
+    if let Err(e) = save(id, &hk) {
+        crate::app_warn!("[quick-coffee] could not persist url-hotkeys for {}: {}", id, e);
+    }
+    results
+}
+
+/// On startup, re-register the persisted URL-hotkeys for every enabled plugin
+/// (so item hotkeys work after a restart with no window opened).
+pub fn register_all_enabled(
+    app: &tauri::AppHandle,
+    plugins: &HashMap<String, crate::plugin::loader::PluginRecord>,
+) {
+    for (id, rec) in plugins {
+        if !rec.enabled {
+            continue;
+        }
+        let hk = load(id);
+        if !hk.bindings.is_empty() {
+            let _ = register(app, &hk);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
