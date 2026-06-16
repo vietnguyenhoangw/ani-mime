@@ -481,6 +481,7 @@ fn uninstall_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
         .ok()
         .and_then(|g| g.plugins.get(&id).and_then(plugin::hotkey::manifest_hotkey));
 
+    plugin::browser::unregister_plugin(&app, &id);
     plugin::loader::uninstall_plugin(&id, &root).map_err(|e| e.to_string())?;
 
     {
@@ -517,12 +518,18 @@ fn set_ani_plugin_enabled(
         if let Some(hk) = &hotkey {
             plugin::hotkey::register(&app, &id, hk);
         }
+        // Re-register persisted URL-hotkeys for this plugin.
+        let hk = plugin::browser::load(&id);
+        if !hk.bindings.is_empty() {
+            let _ = plugin::browser::register(&app, &hk);
+        }
     } else {
         // Disabling unregisters the hotkey and closes any open window
         // (enabling is otherwise lazy — launch on demand).
         if let Some(hk) = &hotkey {
             plugin::hotkey::unregister(&app, hk);
         }
+        plugin::browser::unregister_plugin(&app, &id);
         let label = plugin::runtime::webview_label_for_id(&id);
         if let Some(win) = app.get_webview_window(&label) {
             let _ = win.close();
@@ -840,6 +847,7 @@ pub fn run() {
                     crate::app_log!("[plugin] startup scan: {} installed", count);
                     if let Ok(guard) = app_state.lock() {
                         plugin::hotkey::register_enabled(app.handle(), &guard.plugins);
+                        plugin::browser::register_all_enabled(app.handle(), &guard.plugins);
                     }
                     let _ = app.emit("plugins-changed", ());
                 }
