@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Coffee</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 16px; }
+    h1 { font-size: 16px; margin: 0 0 12px; }
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .row input[type="text"] { flex: 1; padding: 6px 8px; }
+    .hotkey-field { min-width: 140px; padding: 6px 8px; cursor: pointer; text-align: center; border: 1px dashed #888; border-radius: 4px; }
+    .hotkey-field.capturing { border-style: solid; }
+    .status { font-size: 11px; min-width: 70px; }
+    .status.ok { color: #2e9e44; }
+    .status.err { color: #e03131; }
+    button { padding: 6px 10px; cursor: pointer; }
+    .browser-bar { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { border-bottom: 1px solid rgba(128,128,128,.25); padding: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>☕ Quick Coffee</h1>
+
+  <div class="browser-bar">
+    <label for="browser-select">Open in:</label>
+    <select id="browser-select" data-testid="browser-select"></select>
+  </div>
+
+  <ul id="item-list" data-testid="item-list"></ul>
+
+  <div class="row">
+    <button id="add-item-btn" data-testid="add-item-btn">+ Add site</button>
+  </div>
+
+  <script type="module">
+    import { eventToAccelerator } from "./accelerator.js";
+
+    const STORE_KEY = "quickCoffee";
+    let state = { browserBundleId: null, items: [] };
+
+    const $ = (id) => document.getElementById(id);
+    const uid = () => "i" + Math.random().toString(36).slice(2, 10);
+
+    async function load() {
+      const saved = await window.ani.storage.get(STORE_KEY);
+      if (saved && typeof saved === "object") {
+        state.browserBundleId = saved.browserBundleId ?? null;
+        state.items = Array.isArray(saved.items) ? saved.items : [];
+      }
+    }
+
+    async function persistAndRegister() {
+      await window.ani.storage.set(STORE_KEY, state);
+      const bindings = state.items
+        .filter((it) => it.accelerator && it.url)
+        .map((it) => ({ accelerator: it.accelerator, url: it.url }));
+      const results = await window.ani.browser.setHotkeys(state.browserBundleId, bindings);
+      applyResults(results);
+    }
+
+    function applyResults(results) {
+      const byAccel = {};
+      (results || []).forEach((r) => { byAccel[r.accelerator] = r; });
+      state.items.forEach((it) => {
+        const badge = document.querySelector(`[data-testid="status-${it.id}"]`);
+        if (!badge) return;
+        const r = it.accelerator ? byAccel[it.accelerator] : null;
+        if (!it.accelerator || !it.url) { badge.textContent = ""; badge.className = "status"; }
+        else if (r && r.ok) { badge.textContent = "registered"; badge.className = "status ok"; }
+        else { badge.textContent = r ? (r.error || "conflict") : "—"; badge.className = "status err"; }
+      });
+    }
+
+    async function renderBrowsers() {
+      const sel = $("browser-select");
+      const browsers = await window.ani.browser.list();
+      sel.innerHTML = "";
+      const def = document.createElement("option");
+      def.value = ""; def.textContent = "Default browser";
+      sel.appendChild(def);
+      browsers.forEach((b) => {
+        const o = document.createElement("option");
+        o.value = b.bundleId; o.textContent = b.name;
+        sel.appendChild(o);
+      });
+      sel.value = state.browserBundleId || "";
+      sel.onchange = async () => {
+        state.browserBundleId = sel.value || null;
+        await persistAndRegister();
+      };
+    }
+
+    function renderItems() {
+      const list = $("item-list");
+      list.innerHTML = "";
+      state.items.forEach((it) => list.appendChild(renderItem(it)));
+    }
+
+    function renderItem(it) {
+      const li = document.createElement("li");
+      li.dataset.testid = `item-${it.id}`;
+
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const label = document.createElement("input");
+      label.type = "text"; label.placeholder = "Label"; label.value = it.label || "";
+      label.dataset.testid = `label-${it.id}`;
+      label.oninput = () => { it.label = label.value; };
+      label.onblur = () => persistAndRegister();
+
+      const url = document.createElement("input");
+      url.type = "text"; url.placeholder = "https://..."; url.value = it.url || "";
+      url.dataset.testid = `url-${it.id}`;
+      url.oninput = () => { it.url = url.value; };
+      url.onblur = () => persistAndRegister();
+
+      const hk = document.createElement("div");
+      hk.className = "hotkey-field"; hk.tabIndex = 0;
+      hk.dataset.testid = `hotkey-${it.id}`;
+      hk.textContent = it.accelerator || "Click, then press keys";
+      hk.onkeydown = (e) => {
+        e.preventDefault();
+        const accel = eventToAccelerator(e);
+        if (accel) {
+          it.accelerator = accel;
+          hk.textContent = accel;
+          hk.classList.remove("capturing");
+          persistAndRegister();
+        }
+      };
+      hk.onfocus = () => hk.classList.add("capturing");
+      hk.onblur = () => hk.classList.remove("capturing");
+
+      const open = document.createElement("button");
+      open.textContent = "Open"; open.dataset.testid = `open-${it.id}`;
+      open.onclick = () => { if (it.url) window.ani.browser.open(it.url, state.browserBundleId); };
+
+      const del = document.createElement("button");
+      del.textContent = "✕"; del.dataset.testid = `delete-${it.id}`;
+      del.setAttribute("aria-label", "Delete item");
+      del.onclick = async () => {
+        state.items = state.items.filter((x) => x.id !== it.id);
+        renderItems();
+        await persistAndRegister();
+      };
+
+      const status = document.createElement("span");
+      status.className = "status"; status.dataset.testid = `status-${it.id}`;
+
+      row.append(label, url, hk, open, del, status);
+      li.appendChild(row);
+      return li;
+    }
+
+    $("add-item-btn").onclick = () => {
+      state.items.push({ id: uid(), label: "", url: "", accelerator: "" });
+      renderItems();
+    };
+
+    (async function init() {
+      await load();
+      await renderBrowsers();
+      renderItems();
+      applyResults([]); // clear badges until first save
+    })();
+  </script>
+</body>
+</html>
