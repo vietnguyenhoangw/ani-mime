@@ -135,9 +135,20 @@
       hk.onfocus = () => hk.classList.add("capturing");
       hk.onblur = () => hk.classList.remove("capturing");
 
+      const status = document.createElement("span");
+      status.className = "status"; status.dataset.testid = `status-${it.id}`;
+
       const open = document.createElement("button");
       open.textContent = "Open"; open.dataset.testid = `open-${it.id}`;
-      open.onclick = () => { if (it.url) window.ani.browser.open(it.url, state.browserBundleId); };
+      open.onclick = async () => {
+        if (!it.url) return;
+        try {
+          await window.ani.browser.open(it.url, state.browserBundleId);
+        } catch (err) {
+          status.textContent = String(err);
+          status.className = "status err";
+        }
+      };
 
       const del = document.createElement("button");
       del.textContent = "✕"; del.dataset.testid = `delete-${it.id}`;
@@ -147,9 +158,6 @@
         renderItems();
         await persistAndRegister();
       };
-
-      const status = document.createElement("span");
-      status.className = "status"; status.dataset.testid = `status-${it.id}`;
 
       row.append(label, url, hk, open, del, status);
       li.appendChild(row);

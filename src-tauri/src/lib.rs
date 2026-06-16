@@ -503,12 +503,14 @@ fn set_ani_plugin_enabled(
     enabled: bool,
 ) -> Result<(), String> {
     let state = app.state::<Arc<Mutex<AppState>>>();
-    let hotkey = {
+    let (hotkey, declares_browser) = {
         let mut guard = state.lock().map_err(|_| "state lock poisoned")?;
         match guard.plugins.get_mut(&id) {
             Some(rec) => {
                 rec.enabled = enabled;
-                plugin::hotkey::manifest_hotkey(rec)
+                let hk = plugin::hotkey::manifest_hotkey(rec);
+                let db = rec.manifest.capabilities.iter().any(|c| c == "browser");
+                (hk, db)
             }
             None => return Err(format!("plugin '{}' not installed", id)),
         }
@@ -518,10 +520,13 @@ fn set_ani_plugin_enabled(
         if let Some(hk) = &hotkey {
             plugin::hotkey::register(&app, &id, hk);
         }
-        // Re-register persisted URL-hotkeys for this plugin.
-        let hk = plugin::browser::load(&id);
-        if !hk.bindings.is_empty() {
-            let _ = plugin::browser::register(&app, &hk);
+        // Re-register persisted URL-hotkeys for this plugin (only if it
+        // declares the `browser` capability).
+        if declares_browser {
+            let hk = plugin::browser::load(&id);
+            if !hk.bindings.is_empty() {
+                let _ = plugin::browser::register(&app, &hk);
+            }
         }
     } else {
         // Disabling unregisters the hotkey and closes any open window

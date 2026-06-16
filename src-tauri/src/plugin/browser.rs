@@ -4,7 +4,9 @@
 
 use crate::plugin::loader::plugin_dir;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// A single hotkey → URL mapping.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -67,9 +69,6 @@ pub fn save(id: &str, hk: &UrlHotkeys) -> std::io::Result<()> {
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
     std::fs::write(&path, json)
 }
-
-use std::collections::HashMap;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// Register every binding in `hk` as a global shortcut that opens its URL in
 /// `hk.browser_bundle_id`. Returns a per-binding result so the UI can show
@@ -167,7 +166,7 @@ pub fn register_all_enabled(
     plugins: &HashMap<String, crate::plugin::loader::PluginRecord>,
 ) {
     for (id, rec) in plugins {
-        if !rec.enabled {
+        if !rec.enabled || !rec.manifest.capabilities.iter().any(|c| c == "browser") {
             continue;
         }
         let hk = load(id);
