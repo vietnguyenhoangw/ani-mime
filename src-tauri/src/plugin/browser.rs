@@ -2,7 +2,7 @@
 //! the persisted per-plugin `url-hotkeys.json`, and registration of each
 //! binding as a global shortcut that opens its URL in the chosen browser.
 
-use crate::plugin::loader::plugin_dir;
+use crate::plugin::loader::plugin_persistent_dir;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -41,10 +41,11 @@ pub fn is_allowed_url(url: &str) -> bool {
     u.starts_with("http://") || u.starts_with("https://")
 }
 
-/// `~/.ani-mime/plugins/<id>/url-hotkeys.json` (host-owned, sibling to the
-/// plugin's own files; removed automatically when the plugin is uninstalled).
+/// `~/.ani-mime/plugin-data/<id>/url-hotkeys.json` (host-owned). Lives in the
+/// plugin's persistent dir (outside `plugins/<id>/`) so the bound hotkeys
+/// survive uninstall/reinstall.
 pub fn url_hotkeys_path(id: &str) -> std::io::Result<PathBuf> {
-    Ok(plugin_dir(id)?.join("url-hotkeys.json"))
+    Ok(plugin_persistent_dir(id)?.join("url-hotkeys.json"))
 }
 
 /// Load the persisted set (empty default if the file is missing or unreadable).

@@ -38,9 +38,26 @@ pub fn plugin_dir(id: &str) -> std::io::Result<PathBuf> {
     Ok(plugins_root()?.join(id))
 }
 
-/// Returns `~/.ani-mime/plugins/<id>/data/` — created lazily by callers.
+/// Returns `~/.ani-mime/plugin-data/` — persistent per-plugin storage that
+/// lives OUTSIDE the (re)installable `plugins/` tree, so a plugin's saved data
+/// survives uninstall/reinstall (uninstall only removes `plugins/<id>/`).
+pub fn plugin_data_root() -> std::io::Result<PathBuf> {
+    let home = dirs::home_dir()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no home dir"))?;
+    Ok(home.join(".ani-mime").join("plugin-data"))
+}
+
+/// Returns `~/.ani-mime/plugin-data/<id>/` — the plugin's persistent dir
+/// (the `window.ani.storage` store plus host-owned files like url-hotkeys.json).
+/// Preserved across reinstall because it is not under `plugins/<id>/`.
+pub fn plugin_persistent_dir(id: &str) -> std::io::Result<PathBuf> {
+    Ok(plugin_data_root()?.join(id))
+}
+
+/// Returns `~/.ani-mime/plugin-data/<id>/data/` — the `window.ani.storage`
+/// key/value store location. Created lazily by callers.
 pub fn plugin_data_dir(id: &str) -> std::io::Result<PathBuf> {
-    Ok(plugin_dir(id)?.join("data"))
+    Ok(plugin_persistent_dir(id)?.join("data"))
 }
 
 use std::path::Path;
@@ -342,7 +359,7 @@ mod tests {
     fn plugin_data_dir_appends_data() {
         let dir = plugin_data_dir("translator").expect("home dir available");
         assert!(
-            dir.ends_with(".ani-mime/plugins/translator/data"),
+            dir.ends_with(".ani-mime/plugin-data/translator/data"),
             "got {:?}",
             dir
         );
