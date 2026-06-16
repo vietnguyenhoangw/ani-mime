@@ -5,34 +5,157 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quick Coffee</title>
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 16px; }
-    h1 { font-size: 16px; margin: 0 0 12px; }
-    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .row input[type="text"] { flex: 1; padding: 6px 8px; }
-    .hotkey-field { min-width: 140px; padding: 6px 8px; cursor: pointer; text-align: center; border: 1px dashed #888; border-radius: 4px; }
-    .hotkey-field.capturing { border-style: solid; }
-    .status { font-size: 11px; min-width: 70px; }
-    .status.ok { color: #2e9e44; }
-    .status.err { color: #e03131; }
-    button { padding: 6px 10px; cursor: pointer; }
-    .browser-bar { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; }
-    ul { list-style: none; padding: 0; margin: 0; }
-    li { border-bottom: 1px solid rgba(128,128,128,.25); padding: 8px 0; }
+    :root {
+      --bg: #1e1e22;
+      --surface: rgba(255, 255, 255, 0.06);
+      --surface-hover: rgba(255, 255, 255, 0.10);
+      --border: rgba(255, 255, 255, 0.10);
+      --text: #f2f2f4;
+      --muted: rgba(242, 242, 244, 0.55);
+      --accent: #007aff;
+      --green: #34a853;
+      --danger: #e0463e;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5f7;
+        --surface: rgba(0, 0, 0, 0.04);
+        --surface-hover: rgba(0, 0, 0, 0.08);
+        --border: rgba(0, 0, 0, 0.10);
+        --text: #1d1d1f;
+        --muted: rgba(29, 29, 31, 0.55);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 12px;
+    }
+
+    /* ---- Header ---- */
+    .app-head { display: flex; flex-direction: column; gap: 2px; }
+    .app-title { font-size: 15px; font-weight: 600; }
+    .app-sub { color: var(--muted); font-size: 12px; }
+
+    /* ---- Toolbar (browser picker + add) ---- */
+    .toolbar { display: flex; align-items: center; gap: 8px; }
+    .bottom-bar { border-top: 1px solid var(--border); padding-top: 12px; }
+    .tb-label { color: var(--muted); flex-shrink: 0; }
+
+    select {
+      flex: 1; min-width: 0; font: inherit; color: var(--text);
+      -webkit-appearance: none; appearance: none;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 26px 6px 10px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+      text-overflow: ellipsis;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23888888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+    }
+    select:hover { background-color: var(--surface-hover); }
+    select:focus { outline: none; border-color: var(--accent); }
+
+    button {
+      font: inherit; color: var(--text); background: var(--surface);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 6px 10px; cursor: pointer; transition: background 0.12s, border-color 0.12s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: var(--surface-hover); }
+    .primary { background: var(--accent); color: #fff; border-color: transparent; }
+    .primary:hover:not(:disabled) { background: #0a84ff; }
+
+    input[type="text"] {
+      font: inherit; color: var(--text);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 7px; padding: 6px 10px; min-width: 0;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    input[type="text"]::placeholder { color: var(--muted); }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); background: var(--surface-hover); }
+
+    /* ---- Item list ---- */
+    .content { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+    .items { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .empty { color: var(--muted); text-align: center; padding: 24px 8px; margin: auto; }
+    .empty[hidden] { display: none; }
+
+    .item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .item-main { display: flex; align-items: center; gap: 8px; }
+    .url-input { flex: 1; }
+    .item-tools { display: none; align-items: center; gap: 8px; padding-top: 2px; }
+    .item.expanded .item-tools { display: flex; }
+
+    /* (1) Reorder up/down — one stacked control */
+    .reorder { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+    .reorder button {
+      width: 24px; height: 15px; padding: 0; line-height: 1; font-size: 9px;
+      display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
+    }
+    .reorder button:disabled { opacity: 0.3; cursor: default; }
+
+    /* (3) Tools toggle */
+    .tools-toggle { flex-shrink: 0; width: 34px; padding: 6px 0; font-size: 14px; line-height: 1; }
+    .tools-toggle.active { color: var(--accent); border-color: var(--accent); }
+    .tools-toggle.has-error { color: var(--danger); border-color: rgba(224, 70, 62, 0.5); }
+
+    /* Hotkey-capture chip */
+    .hotkey {
+      font: inherit; font-size: 12px; line-height: 1;
+      color: var(--text); background: var(--surface);
+      border: 1px dashed var(--border); border-radius: 7px;
+      padding: 6px 10px; cursor: pointer; min-width: 150px; text-align: center;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .hotkey:hover { background: var(--surface-hover); }
+    .hotkey.set { border-style: solid; }
+    .hotkey.capturing { border-style: solid; border-color: var(--accent); color: var(--accent); background: rgba(0, 122, 255, 0.10); }
+    .hotkey:focus { outline: none; }
+
+    .status { font-size: 11px; color: var(--muted); flex: 1; }
+    .status.ok { color: var(--green); }
+    .status.err { color: var(--danger); }
+
+    .icon-btn {
+      width: 28px; height: 28px; padding: 0; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 14px; line-height: 1;
+      background: transparent; border: 1px solid transparent;
+    }
+    .icon-btn:hover:not(:disabled) { background: transparent; color: var(--danger); border-color: rgba(224, 70, 62, 0.4); }
+    .open-btn { color: var(--text); }
   </style>
 </head>
 <body>
-  <h1>☕ Quick Coffee</h1>
+  <header class="app-head">
+    <div class="app-title">☕ Quick Coffee</div>
+    <div class="app-sub">Assign a global hotkey to a site — press it anywhere to open it in your browser.</div>
+  </header>
 
-  <div class="browser-bar">
-    <label for="browser-select">Open in:</label>
-    <select id="browser-select" data-testid="browser-select"></select>
+  <div class="content">
+    <ul id="item-list" class="items" data-testid="item-list"></ul>
+    <p id="empty-state" class="empty" data-testid="empty-state" hidden>
+      No sites yet — click “+ Add site” to create one.
+    </p>
   </div>
 
-  <ul id="item-list" data-testid="item-list"></ul>
-
-  <div class="row">
-    <button id="add-item-btn" data-testid="add-item-btn">+ Add site</button>
+  <div class="toolbar bottom-bar">
+    <span class="tb-label" id="browser-label">Open in</span>
+    <select id="browser-select" data-testid="browser-select" aria-labelledby="browser-label"></select>
+    <button id="add-item-btn" class="primary" data-testid="add-item-btn">+ Add site</button>
   </div>
 
   <script type="module">
@@ -40,6 +163,7 @@
 
     const STORE_KEY = "quickCoffee";
     let state = { browserBundleId: null, items: [] };
+    const expanded = new Set(); // item ids whose tools row is open (UI-only, not persisted)
 
     const $ = (id) => document.getElementById(id);
     const uid = () => "i" + Math.random().toString(36).slice(2, 10);
@@ -66,11 +190,15 @@
       (results || []).forEach((r) => { byAccel[r.accelerator] = r; });
       state.items.forEach((it) => {
         const badge = document.querySelector(`[data-testid="status-${it.id}"]`);
+        const toggle = document.querySelector(`[data-testid="tools-toggle-${it.id}"]`);
         if (!badge) return;
         const r = it.accelerator ? byAccel[it.accelerator] : null;
+        let err = false;
         if (!it.accelerator || !it.url) { badge.textContent = ""; badge.className = "status"; }
-        else if (r && r.ok) { badge.textContent = "registered"; badge.className = "status ok"; }
-        else { badge.textContent = r ? (r.error || "conflict") : "—"; badge.className = "status err"; }
+        else if (r && r.ok) { badge.textContent = "✓ registered"; badge.className = "status ok"; }
+        else { badge.textContent = r ? (r.error || "conflict") : "—"; badge.className = "status err"; err = true; }
+        // Surface conflicts on the gear so they're visible even when collapsed.
+        if (toggle) toggle.classList.toggle("has-error", err);
       });
     }
 
@@ -96,76 +224,145 @@
     function renderItems() {
       const list = $("item-list");
       list.innerHTML = "";
-      state.items.forEach((it) => list.appendChild(renderItem(it)));
+      state.items.forEach((it, i) => list.appendChild(renderItem(it, i)));
+      $("empty-state").hidden = state.items.length > 0;
     }
 
-    function renderItem(it) {
+    function moveItem(id, dir) {
+      const i = state.items.findIndex((x) => x.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= state.items.length) return;
+      const [it] = state.items.splice(i, 1);
+      state.items.splice(j, 0, it);
+      renderItems();
+      persistAndRegister();
+    }
+
+    function setHotkeyLabel(hk, it) {
+      hk.textContent = it.accelerator || "Click, then press keys";
+      hk.classList.toggle("set", !!it.accelerator);
+    }
+
+    function renderItem(it, index) {
       const li = document.createElement("li");
+      li.className = "item" + (expanded.has(it.id) ? " expanded" : "");
       li.dataset.testid = `item-${it.id}`;
 
-      const row = document.createElement("div");
-      row.className = "row";
+      // ===== Main row: reorder · url · tools toggle · open =====
+      const main = document.createElement("div");
+      main.className = "item-main";
 
-      const label = document.createElement("input");
-      label.type = "text"; label.placeholder = "Label"; label.value = it.label || "";
-      label.dataset.testid = `label-${it.id}`;
-      label.oninput = () => { it.label = label.value; };
-      label.onblur = () => persistAndRegister();
+      // (1) reorder up/down
+      const reorder = document.createElement("div");
+      reorder.className = "reorder";
+      const up = document.createElement("button");
+      up.textContent = "▲"; up.dataset.testid = `move-up-${it.id}`;
+      up.setAttribute("aria-label", "Move up"); up.title = "Move up";
+      up.disabled = index === 0;
+      up.onclick = () => moveItem(it.id, -1);
+      const down = document.createElement("button");
+      down.textContent = "▼"; down.dataset.testid = `move-down-${it.id}`;
+      down.setAttribute("aria-label", "Move down"); down.title = "Move down";
+      down.disabled = index === state.items.length - 1;
+      down.onclick = () => moveItem(it.id, 1);
+      reorder.append(up, down);
 
+      // (2) url
       const url = document.createElement("input");
-      url.type = "text"; url.placeholder = "https://..."; url.value = it.url || "";
+      url.type = "text"; url.className = "url-input";
+      url.placeholder = "https://…"; url.value = it.url || "";
       url.dataset.testid = `url-${it.id}`;
       url.oninput = () => { it.url = url.value; };
       url.onblur = () => persistAndRegister();
 
+      // (4) open (created early; its handler references `status` defined below)
+      const open = document.createElement("button");
+      open.className = "open-btn"; open.textContent = "Open";
+      open.dataset.testid = `open-${it.id}`;
+      open.title = "Open this site now";
+
+      // (3) tools toggle
+      const toggle = document.createElement("button");
+      toggle.className = "tools-toggle" + (expanded.has(it.id) ? " active" : "");
+      toggle.textContent = "⋮";
+      toggle.dataset.testid = `tools-toggle-${it.id}`;
+      toggle.setAttribute("aria-label", "Show hotkey & delete tools");
+      toggle.setAttribute("aria-expanded", String(expanded.has(it.id)));
+      toggle.title = "Hotkey & delete";
+
+      main.append(reorder, url, toggle, open);
+
+      // ===== Tools row: (5) hotkey · status · (6) delete =====
+      const tools = document.createElement("div");
+      tools.className = "item-tools";
+      tools.dataset.testid = `tools-${it.id}`;
+
+      // (5) hotkey setup
       const hk = document.createElement("div");
-      hk.className = "hotkey-field"; hk.tabIndex = 0;
+      hk.className = "hotkey"; hk.tabIndex = 0;
       hk.dataset.testid = `hotkey-${it.id}`;
-      hk.textContent = it.accelerator || "Click, then press keys";
+      hk.title = "Click, then press a key combo";
+      setHotkeyLabel(hk, it);
       hk.onkeydown = (e) => {
         e.preventDefault();
+        if (e.key === "Escape") { hk.blur(); return; }
         const accel = eventToAccelerator(e);
         if (accel) {
           it.accelerator = accel;
-          hk.textContent = accel;
+          setHotkeyLabel(hk, it);
           hk.classList.remove("capturing");
           persistAndRegister();
         }
       };
-      hk.onfocus = () => hk.classList.add("capturing");
-      hk.onblur = () => hk.classList.remove("capturing");
+      hk.onfocus = () => { hk.classList.add("capturing"); hk.textContent = "Press keys… (Esc)"; };
+      hk.onblur = () => { hk.classList.remove("capturing"); setHotkeyLabel(hk, it); };
 
       const status = document.createElement("span");
       status.className = "status"; status.dataset.testid = `status-${it.id}`;
 
-      const open = document.createElement("button");
-      open.textContent = "Open"; open.dataset.testid = `open-${it.id}`;
-      open.onclick = async () => {
-        if (!it.url) return;
-        try {
-          await window.ani.browser.open(it.url, state.browserBundleId);
-        } catch (err) {
-          status.textContent = String(err);
-          status.className = "status err";
-        }
-      };
-
+      // (6) delete
       const del = document.createElement("button");
-      del.textContent = "✕"; del.dataset.testid = `delete-${it.id}`;
-      del.setAttribute("aria-label", "Delete item");
+      del.className = "icon-btn"; del.textContent = "✕";
+      del.dataset.testid = `delete-${it.id}`;
+      del.setAttribute("aria-label", "Delete site");
+      del.title = "Delete site";
       del.onclick = async () => {
+        expanded.delete(it.id);
         state.items = state.items.filter((x) => x.id !== it.id);
         renderItems();
         await persistAndRegister();
       };
 
-      row.append(label, url, hk, open, del, status);
-      li.appendChild(row);
+      tools.append(hk, status, del);
+
+      // open handler (status is now in scope); expand on error so it's visible
+      open.onclick = async () => {
+        if (!it.url) return;
+        try {
+          await window.ani.browser.open(it.url, state.browserBundleId);
+        } catch (err) {
+          setExpanded(li, toggle, it.id, true);
+          status.textContent = String(err);
+          status.className = "status err";
+        }
+      };
+
+      // toggle handler
+      toggle.onclick = () => setExpanded(li, toggle, it.id, !expanded.has(it.id));
+
+      li.append(main, tools);
       return li;
     }
 
+    function setExpanded(li, toggle, id, open) {
+      if (open) expanded.add(id); else expanded.delete(id);
+      li.classList.toggle("expanded", open);
+      toggle.classList.toggle("active", open);
+      toggle.setAttribute("aria-expanded", String(open));
+    }
+
     $("add-item-btn").onclick = () => {
-      state.items.push({ id: uid(), label: "", url: "", accelerator: "" });
+      state.items.push({ id: uid(), url: "", accelerator: "" });
       renderItems();
     };
 
