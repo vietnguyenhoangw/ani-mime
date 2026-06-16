@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.18.1] - 2026-06-16
+
+### Added
+- **Quick Coffee plugin.** Assign a system-wide hotkey to any website and open it in a chosen browser (macOS lists installed browsers; other platforms use the OS default). Hotkeys fire even with the window closed and after a restart. Manage sites in an app-styled window with a reorderable list, per-item URL + hotkey, and a one-click "Open".
+- **`browser` plugin capability.** Lets a plugin list installed browsers, open an `http`/`https` URL in a chosen one, and register per-item global hotkeys (host-owned and persisted).
+- **Clearable launch hotkeys.** A plugin's launch shortcut can now be left empty / cleared from the Plugin Manager.
+
+### Changed
+- **Plugin data survives reinstall.** Per-plugin storage and hotkey bindings now live in `~/.ani-mime/plugin-data/<id>/`, outside the directory removed on uninstall.
+
 ## [0.18.0] - 2026-06-15
 
 ### Added
