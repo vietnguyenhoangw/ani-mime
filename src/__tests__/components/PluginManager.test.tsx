@@ -65,6 +65,31 @@ describe("PluginManager", () => {
     );
   });
 
+  it("clicking the clear (✕) button clears the launch hotkey to empty", async () => {
+    const withKey = rec("translator");
+    withKey.manifest.hotkey = "CmdOrCtrl+Shift+V";
+    mockInvoke("get_plugins", [withKey]);
+    mockInvoke("set_plugin_hotkey", null);
+    render(<PluginManager />);
+
+    const clear = await screen.findByTestId("plugin-hotkey-clear-translator");
+    fireEvent.click(clear);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("set_plugin_hotkey", {
+        id: "translator",
+        hotkey: "",
+      })
+    );
+  });
+
+  it("shows no clear button when a plugin has no launch hotkey", async () => {
+    mockInvoke("get_plugins", [rec("screenshot")]);
+    render(<PluginManager />);
+    await screen.findByTestId("plugin-card-screenshot");
+    expect(screen.queryByTestId("plugin-hotkey-clear-screenshot")).toBeNull();
+  });
+
   it("records an Option-based shortcut via e.code (macOS rewrites e.key)", async () => {
     const withKey = rec("translator");
     withKey.manifest.hotkey = "CmdOrCtrl+Shift+V";

@@ -125,6 +125,26 @@
   color: #007aff;
 }
 
+/* Hotkey badge + its clear (✕) button, grouped at the footer's left. */
+.plugin-hotkey-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.plugin-hotkey-clear {
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted, rgba(128, 128, 128, 0.8));
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.plugin-hotkey-clear:hover { color: #e03131; border-color: rgba(224, 49, 49, 0.4); }
+
 /* "+ Shortcut" affordance for plugins with no hotkey yet. */
 .plugin-hotkey-add {
   font: inherit;

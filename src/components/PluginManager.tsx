@@ -235,15 +235,27 @@ function PluginCard({
             Press keys… (Esc)
           </button>
         ) : manifest.hotkey ? (
-          <button
-            type="button"
-            className="plugin-hotkey"
-            data-testid={`plugin-hotkey-${manifest.id}`}
-            title="Click to reassign shortcut"
-            onClick={() => setRecording(true)}
-          >
-            {formatHotkey(manifest.hotkey)}
-          </button>
+          <span className="plugin-hotkey-wrap">
+            <button
+              type="button"
+              className="plugin-hotkey"
+              data-testid={`plugin-hotkey-${manifest.id}`}
+              title="Click to reassign shortcut"
+              onClick={() => setRecording(true)}
+            >
+              {formatHotkey(manifest.hotkey)}
+            </button>
+            <button
+              type="button"
+              className="plugin-hotkey-clear"
+              data-testid={`plugin-hotkey-clear-${manifest.id}`}
+              aria-label="Clear launch shortcut"
+              title="Clear launch shortcut"
+              onClick={() => onSetHotkey("")}
+            >
+              ✕
+            </button>
+          </span>
         ) : (
           <button
             type="button"
